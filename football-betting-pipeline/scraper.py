@@ -12,6 +12,7 @@
 import os
 import re
 import time
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import urljoin
 
@@ -62,7 +63,8 @@ class ZhiyunScraper:
         """主流程：打开页面 -> 足球 -> 即时比分 -> 足彩 -> 北单，获取列表并下载 Excel（跳过隐藏场次）。"""
         now = _now_in_tz()
         self._run_time_suffix = now.strftime("%Y%m%d%H")
-        print(f"[爬虫] 本次运行时间戳（文件名用）: {self._run_time_suffix} （当前时区时间: {now.strftime('%Y-%m-%d %H:%M')}）", flush=True)
+        log = logging.getLogger("crawl")
+        log.info("[爬虫] 本次运行时间戳（文件名用）: %s （当前时区时间: %s）", self._run_time_suffix, now.strftime('%Y-%m-%d %H:%M'))
         self.driver.get(self.base_url)
         wait = WebDriverWait(self.driver, WAIT_ELEMENT)
 
@@ -78,7 +80,7 @@ class ZhiyunScraper:
 
         # 3) 对 竞足、北单、14场 分别处理（当前配置里只保留了「北单」）
         for menu_option in ZUCAI_MENU_OPTIONS:
-            print(f"========== 获取 [{menu_option}] 比赛列表 ==========")
+            log.info("========== 获取 [%s] 比赛列表 ==========", menu_option)
             first_row_home_before = self._get_first_data_row_home_team()
             self._hover_zucai_then_click_option(wait, menu_option)
             self._ensure_zucai_mode(menu_option)
@@ -94,11 +96,13 @@ class ZhiyunScraper:
 
             match_rows = self._collect_match_rows(wait, visible_only=True)
             hidden_in_dom = self._count_hidden_rows_in_table()
-            print(f"[{menu_option}] 当前列表显示: {len(match_rows)} 场，表格中隐藏行: {hidden_in_dom} 场")
-            print("--- 主队 vs 客队 ---")
+            log.info("[%s] 当前列表显示: %d 场，表格中隐藏行: %d 场", menu_option, len(match_rows), hidden_in_dom)
+            log.info("--- 主队 vs 客队 ---")
             for i, row in enumerate(match_rows, 1):
                 home = self._get_cell_text(row, COL_HOME)
                 away = self._get_cell_text(row, COL_AWAY)
+                date_str = self._get_cell_text(row, COL_DATE)
+                time_str = self._get_cell_text(row, COL_TIME)
 
                 # 若配置了 DEBUG_MATCH_KEYWORDS，则仅抓取主队/客队名称包含任一关键词的比赛
                 if DEBUG_MATCH_KEYWORDS:
@@ -106,12 +110,13 @@ class ZhiyunScraper:
                     if not any(kw in text for kw in DEBUG_MATCH_KEYWORDS):
                         continue
 
-                print(f"{i}. {home} vs {away}")
+                msg = f"{i}. {date_str} {time_str} {home} vs {away}"
+                log.info(msg)
                 self._download_excel_for_row(wait, row, i, home, away, time_suffix=self._run_time_suffix)
                 if DEBUG_MAX_MATCHES and i >= DEBUG_MAX_MATCHES:
-                    print(f"[调试] 已抓取 {DEBUG_MAX_MATCHES} 场，结束抓取。")
+                    log.info("[调试] 已抓取 %d 场，结束抓取。", DEBUG_MAX_MATCHES)
                     break
-            print()
+            log.info("")
 
     def _hover_zucai_then_click_option(self, wait, option_text):
         """鼠标移到「足彩」弹出菜单，再点击指定项（竞足/北单/14场）。"""
@@ -583,7 +588,7 @@ class ZhiyunScraper:
             except Exception:
                 before_files = set()
 
-            print(f"开始下载第 {index} 场 Excel: {home} vs {away}")
+            logging.getLogger("crawl").info("开始下载第 %d 场 Excel: %s vs %s", index, home, away)
             time.sleep(1.5)  # 详情页表格/脚本可能较晚渲染，多等一会再找 downobj
             try:
                 clicked = self.driver.execute_script("""
@@ -753,7 +758,9 @@ class ZhiyunScraper:
                 if os.path.exists(dest_path):
                     os.remove(dest_path)
                 os.rename(new_path, dest_path)
-            print(f"已保存为: {dest_path}")
+            root = os.path.abspath(os.path.join(self.download_dir, os.pardir))
+            rel = os.path.relpath(dest_path, root)
+            logging.getLogger("crawl").info("已保存为: %s", rel)
         except Exception as e:
             print(f"重命名下载文件失败: {e}")
 
