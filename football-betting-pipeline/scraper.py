@@ -4,8 +4,8 @@
 逻辑与 Java 版 ZhiyunScraperService 一致。
 
 下载方式：
-- 使用 Selenium 进入「足球 → 即时比分 → 足彩 → 北单」，解析每一场比赛；
-- 对每场比赛，点击行内的「欧」链接，打开详情页；
+- 使用 Selenium 进入「足球 → 即时比分 → 足彩 → 北单」，等待表格刷新后仅处理状态为空的比赛（空白或「-」）；
+- 对每场状态为空的比赛，点击行内的「欧」链接，打开详情页；
 - 在详情页中点击「导出Excel」按钮，由浏览器下载 .xls；
 - 将 .xls 文件重命名为「主队 VS 客队{YYYYMMDDHH}.xls」。
 """
@@ -38,6 +38,7 @@ from config import (
     ZUCAI_MENU_OPTIONS,
     COL_DATE,
     COL_TIME,
+    COL_STATUS,
     COL_HOME,
     COL_AWAY,
     WAIT_ELEMENT,
@@ -69,7 +70,7 @@ class ZhiyunScraper:
             pass
 
     def run(self):
-        """主流程：打开页面 -> 足球 -> 即时比分 -> 足彩 -> 北单，获取列表并下载 Excel（跳过隐藏场次）。"""
+        """主流程：打开页面 -> 足球 -> 即时比分 -> 足彩 -> 北单，等待表格刷新后仅处理状态为空的比赛，逐场导出并下载 Excel。"""
         now = _now_in_tz()
         self._run_time_suffix = now.strftime("%Y%m%d%H")
         log = logging.getLogger("crawl_real")
@@ -109,6 +110,9 @@ class ZhiyunScraper:
             match_rows = self._collect_match_rows(wait, visible_only=True)
             hidden_in_dom = self._count_hidden_rows_in_table()
             log.info("[%s] 当前列表显示: %d 场，表格中隐藏行: %d 场", menu_option, len(match_rows), hidden_in_dom)
+            # 仅处理状态为空的比赛（未开赛等；状态为「比赛中」「完」或分钟数的不下载）
+            match_rows = [row for row in match_rows if self._is_status_empty(self._get_cell_text(row, COL_STATUS))]
+            log.info("[%s] 过滤后（仅状态为空）: %d 场", menu_option, len(match_rows))
             log.info("--- 主队 vs 客队 ---")
             for i, row in enumerate(match_rows, 1):
                 home = self._get_cell_text(row, COL_HOME)
@@ -815,6 +819,11 @@ class ZhiyunScraper:
             text = text.strip()
         # 将单元格中的换行/tab 等压缩为单个空格，避免日志被拆成多行
         return " ".join(text.split())
+
+    def _is_status_empty(self, status_text: str) -> bool:
+        """状态列为空（空白或「-」）时返回 True，仅此类比赛会下载；「比赛中」「完」等返回 False。"""
+        s = (status_text or "").strip()
+        return s == "" or s == "-"
 
     def _preview_row(self, row):
         """打印该行前几列文本，用于排查“无欧链接”的行是表头还是异常数据。"""

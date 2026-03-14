@@ -74,6 +74,7 @@ ZUCAI_MENU_OPTIONS = ["北单"]
 # 表格列索引（与页面一致）：选、日期、时间、状态、主队、比分、客队、…
 COL_DATE = 1
 COL_TIME = 2
+COL_STATUS = 3   # 状态列：仅下载状态为空的比赛（空白或「-」），不下载「比赛中」「完」等
 COL_HOME = 4
 COL_AWAY = 6
 
