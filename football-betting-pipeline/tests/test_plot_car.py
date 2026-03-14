@@ -7,6 +7,7 @@ import pytest
 from plot_car import (
     _safe_filename,
     _to_float,
+    _compute_prediction,
     _resolve_data_dir,
     _setup_logging,
     _setup_chinese_font,
@@ -41,6 +42,23 @@ def test_to_float_converts_and_preserves_nan():
     out = _to_float(s)
     assert list(out[:2]) == [1.5, 2.0]
     assert pd.isna(out.iloc[2])
+
+
+def test_compute_prediction_ascending_order():
+    """设计书 3.3.3：最后时间点 G/H/I 升序，最小与次小对应 预测结果1、预测结果2。"""
+    # 最后一行 G(主)=0.23 H(平)=0.20 I(客)=0.16 -> 升序 客、平、主 -> 预测 客平
+    data = pd.DataFrame(
+        {f"C{i}": [0.0] * 1 for i in range(12)},
+    )
+    data["C6"], data["C7"], data["C8"] = 0.23, 0.20, 0.16  # 即时盘 主/平/客
+    grp = data.copy()
+    assert _compute_prediction(grp, data) == "客平"
+
+
+def test_compute_prediction_empty_returns_data不足():
+    data = pd.DataFrame(columns=[f"C{i}" for i in range(12)])
+    grp = pd.DataFrame()
+    assert _compute_prediction(grp, data) == "数据不足"
 
 
 def test_resolve_data_dir_absolute():

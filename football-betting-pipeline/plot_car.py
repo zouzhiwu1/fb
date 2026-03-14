@@ -96,6 +96,30 @@ def _to_float(series: pd.Series):
     return pd.to_numeric(series, errors="coerce")
 
 
+def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
+    """
+    预测结果算法（design.md 3.3.3）：
+    取最后时间点的即时盘 G/H/I（主/平/客），按值升序排序，
+    最小的作为预测结果1，次小的作为预测结果2，组合为「预测结果1预测结果2」如「客平」。
+    """
+    if len(grp) == 0:
+        return "数据不足"
+    last = grp.iloc[-1]
+    main_val = pd.to_numeric(last[data.columns[COL_LIVE_MAIN]], errors="coerce")
+    draw_val = pd.to_numeric(last[data.columns[COL_LIVE_DRAW]], errors="coerce")
+    away_val = pd.to_numeric(last[data.columns[COL_LIVE_AWAY]], errors="coerce")
+    pairs = [
+        (main_val, "主"),
+        (draw_val, "平"),
+        (away_val, "客"),
+    ]
+    valid = [(v, label) for v, label in pairs if pd.notna(v)]
+    if len(valid) < 2:
+        return "数据不足"
+    valid.sort(key=lambda x: x[0])
+    return valid[0][1] + valid[1][1]
+
+
 def plot_match_curves(data_dir: str, project_dir: str) -> int:
     """
     读取 REPORT_DIR/{YYYYMMDD}/ 下的 CAR{YYYYMMDD}.xlsx，按（主队、客队）分组，
@@ -130,11 +154,13 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
             continue
         home_str = str(home).strip()
         away_str = str(away).strip()
-        title = f"{home_str} VS {away_str}"
+        prediction = _compute_prediction(grp, data)
+        title_line1 = f"{home_str} VS {away_str}"
+        title_line2 = f"预测结果：{prediction}"
 
         # 为手机端展示优化：偏竖屏比例、较高分辨率，便于在窄屏上查看
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 10))
-        fig.suptitle(title, fontsize=14)
+        fig.suptitle(title_line1 + "\n" + title_line2, fontsize=14)
 
         # ---------- 欧赔指数曲线图 ----------
         # 第 1 节点：初指 D/E/F；第 2～N+1 节点：即时 G/H/I（N = 该场比赛时间点数量，由表决定）
