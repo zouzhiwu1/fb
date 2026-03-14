@@ -69,7 +69,10 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    logger.info("日志文件: %s", log_path)
+    # 日志中只打印相对路径，避免带上 /Users/... 这样的前缀
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    rel_log_path = os.path.relpath(log_path, project_root)
+    logger.info("日志文件: %s", rel_log_path)
     return logger
 
 
@@ -249,7 +252,9 @@ def main():
         log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, removed)
     # 确认实际执行的脚本路径（若看不到“原因”等输出，请检查是否运行了其他目录下的脚本）
     _script_path = os.path.abspath(__file__)
-    log.info("[merge_data] 正在执行: %s", _script_path)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    rel_script_path = os.path.relpath(_script_path, project_root)
+    log.info("[merge_data] 正在执行: %s", rel_script_path)
 
     # 新版本：必须显式传入起始、终止时间点两个参数（YYYYMMDDHH、YYYYMMDDHH）
     if len(sys.argv) != 3:
@@ -345,7 +350,8 @@ def main():
         w.writerow(header_row1)
         w.writerow(header_row2)
         w.writerows(rows)
-    log.info("已合并 %d 个文件，共 %d 行 -> %s", len(files), len(rows), output_path)
+    rel_output = os.path.relpath(output_path, project_root)
+    log.info("已合并 %d 个文件，共 %d 行 -> %s", len(files), len(rows), rel_output)
 
 
 if __name__ == "__main__":

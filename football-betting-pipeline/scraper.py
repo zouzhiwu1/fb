@@ -59,6 +59,15 @@ class ZhiyunScraper:
         self.base_url = base_url
         self.download_dir = download_dir
 
+    def _wait_page_loaded(self, timeout=WAIT_ELEMENT):
+        """等待当前页面 readyState 为 complete，超时则忽略错误。"""
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+        except Exception:
+            pass
+
     def run(self):
         """主流程：打开页面 -> 足球 -> 即时比分 -> 足彩 -> 北单，获取列表并下载 Excel（跳过隐藏场次）。"""
         now = _now_in_tz()
@@ -71,12 +80,10 @@ class ZhiyunScraper:
         # 1) 点击主菜单「足球」
         football_menu = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "足球")))
         self._scroll_into_view_and_click(football_menu)
-        time.sleep(WAIT_AFTER_CLICK)
 
-        # 2) 点击「即时比分」
+        # 2) 点击「即时比分」，依赖显式等待而非固定 sleep
         live_tab = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "即时比分")))
         self._scroll_into_view_and_click(live_tab)
-        time.sleep(WAIT_AFTER_CLICK)
 
         # 3) 对 竞足、北单、14场 分别处理（当前配置里只保留了「北单」）
         for menu_option in ZUCAI_MENU_OPTIONS:
@@ -84,9 +91,14 @@ class ZhiyunScraper:
             first_row_home_before = self._get_first_data_row_home_team()
             self._hover_zucai_then_click_option(wait, menu_option)
             self._ensure_zucai_mode(menu_option)
-            if not self._wait_until_match_row_count_at_most(150):
-                print(f"[{menu_option}] 警告：表格行数仍很多，可能未切换到当前类型")
-            self._wait_until_first_row_changed(first_row_home_before)
+            # SetLevel 后等待表格行数“收敛”，这里将超时限制在 10 秒以内，避免长时间阻塞
+            row_ok = self._wait_until_match_row_count_at_most(150, timeout=10)
+            if not row_ok:
+                ts = _now_in_tz().strftime("%Y-%m-%d %H:%M:%S")
+                log.warning("%s [%s] 警告：表格行数仍很多，可能未切换到当前类型", ts, menu_option)
+            else:
+                # 只有在行数已经收敛时，才再等第一行变化，避免额外长时间等待
+                self._wait_until_first_row_changed(first_row_home_before)
 
             if not self._ensure_valid_window():
                 print(f"[{menu_option}] 无可用窗口，跳过", file=__import__("sys").stderr)
@@ -101,8 +113,8 @@ class ZhiyunScraper:
             for i, row in enumerate(match_rows, 1):
                 home = self._get_cell_text(row, COL_HOME)
                 away = self._get_cell_text(row, COL_AWAY)
-                date_str = self._get_cell_text(row, COL_DATE)
-                time_str = self._get_cell_text(row, COL_TIME)
+                # 使用解析后的时间戳，避免原始单元格中换行导致日志换行
+                match_ts = self._get_time_suffix_from_row(row)
 
                 # 若配置了 DEBUG_MATCH_KEYWORDS，则仅抓取主队/客队名称包含任一关键词的比赛
                 if DEBUG_MATCH_KEYWORDS:
@@ -110,7 +122,7 @@ class ZhiyunScraper:
                     if not any(kw in text for kw in DEBUG_MATCH_KEYWORDS):
                         continue
 
-                msg = f"{i}. {date_str} {time_str} {home} vs {away}"
+                msg = f"{i}. {match_ts} {home} vs {away}"
                 log.info(msg)
                 self._download_excel_for_row(wait, row, i, home, away, time_suffix=self._run_time_suffix)
                 if DEBUG_MAX_MATCHES and i >= DEBUG_MAX_MATCHES:
@@ -122,13 +134,18 @@ class ZhiyunScraper:
         """鼠标移到「足彩」弹出菜单，再点击指定项（竞足/北单/14场）。"""
         zucai_btn = wait.until(EC.presence_of_element_located((By.LINK_TEXT, "足彩")))
         ActionChains(self.driver).move_to_element(zucai_btn).perform()
-        time.sleep(WAIT_AFTER_HOVER)
-        options = self.driver.find_elements(By.LINK_TEXT, option_text)
-        to_click = None
-        for i in range(len(options) - 1, -1, -1):
-            if options[i].is_displayed():
-                to_click = options[i]
-                break
+
+        # 等待子菜单中的目标选项真正可见再点击，避免固定 sleep
+        def _visible_options(d):
+            opts = [o for o in d.find_elements(By.LINK_TEXT, option_text) if o.is_displayed()]
+            return opts if opts else False
+
+        try:
+            options = WebDriverWait(self.driver, WAIT_ELEMENT).until(_visible_options)
+        except TimeoutException:
+            options = []
+
+        to_click = options[-1] if options else None
         if to_click is None:
             to_click = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, option_text)))
         self._scroll_into_view_and_click(to_click)
@@ -141,7 +158,8 @@ class ZhiyunScraper:
                 f"return typeof window.SetLevel === 'function' && (window.SetLevel({level}), true);"
             )
             if ok:
-                print(f"已通过 SetLevel({level}) 切换到 [{menu_option}]")
+                ts = _now_in_tz().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"{ts} 已通过 SetLevel({level}) 切换到 [{menu_option}]")
         except Exception:
             pass
 
@@ -197,31 +215,47 @@ class ZhiyunScraper:
         except Exception:
             return 999
 
-    def _wait_until_match_row_count_at_most(self, max_count):
-        """等表格行数 <= maxCount，最多等 WAIT_ROW_COUNT 秒。"""
-        time.sleep(WAIT_TABLE_REFRESH)
-        wait = WebDriverWait(self.driver, WAIT_ROW_COUNT)
+    def _wait_until_match_row_count_at_most(self, max_count, timeout=None):
+        """等表格行数 <= maxCount，最多等 timeout(秒)，默认 WAIT_ROW_COUNT。"""
+        start = time.time()
+        if timeout is None:
+            timeout = WAIT_ROW_COUNT
+        wait = WebDriverWait(self.driver, timeout)
+
+        def _row_count_ok(d):
+            # 先等过一个最小刷新间隔，再判断行数条件
+            if time.time() - start < WAIT_TABLE_REFRESH:
+                return False
+            cnt = self._get_match_row_count()
+            return 0 < cnt <= max_count
+
         try:
-            wait.until(lambda d: self._get_match_row_count() <= max_count and self._get_match_row_count() > 0)
+            wait.until(_row_count_ok)
             return True
         except TimeoutException:
             return False
 
     def _wait_until_first_row_changed(self, first_row_home_before):
         """等表格第一行数据变化，最多等 WAIT_FIRST_ROW_CHANGED 秒。"""
-        time.sleep(WAIT_TABLE_REFRESH)
+        start = time.time()
         wait = WebDriverWait(self.driver, WAIT_FIRST_ROW_CHANGED)
+
+        def _first_row_changed(d):
+            if time.time() - start < WAIT_TABLE_REFRESH:
+                return False
+            now = self._get_first_data_row_home_team()
+            return bool(now and now != first_row_home_before)
+
         try:
-            wait.until(lambda d: (
-                (now := self._get_first_data_row_home_team()) and now != first_row_home_before
-            ))
+            wait.until(_first_row_changed)
             return True
         except TimeoutException:
             return False
 
     def _select_primary_matches(self, wait):
         """打开「赛事选择」弹窗，点击「一级赛事」，再关闭弹窗。多策略查找 + 弹窗等待 + 重试。"""
-        for attempt in range(2):
+        # 为避免在找不到弹窗/按钮时长时间阻塞，这里限制为单次尝试，并控制整体超时时间。
+        for attempt in range(1):
             try:
                 # 1) 点「赛事选择」打开弹窗（链接或可点击文字）
                 choice_selectors = [
@@ -232,7 +266,7 @@ class ZhiyunScraper:
                 for i in range(0, len(choice_selectors), 2):
                     by, value = choice_selectors[i], choice_selectors[i + 1]
                     try:
-                        choice_btn = WebDriverWait(self.driver, 8).until(
+                        choice_btn = WebDriverWait(self.driver, 5).until(
                             EC.element_to_be_clickable((by, value))
                         )
                         if choice_btn and choice_btn.is_displayed():
@@ -242,10 +276,9 @@ class ZhiyunScraper:
                 if not choice_btn or not choice_btn.is_displayed():
                     raise ValueError("未找到可点击的「赛事选择」")
                 self._scroll_into_view_and_click(choice_btn)
-                time.sleep(0.8)
 
                 # 2) 等弹窗出现后再找「一级赛事」（支持文本含空格、子节点）
-                dialog_wait = WebDriverWait(self.driver, 10)
+                dialog_wait = WebDriverWait(self.driver, 8)
                 primary_selectors = [
                     "//*[normalize-space(text())='一级赛事']",
                     "//*[contains(text(),'一级赛事')]",
@@ -254,21 +287,27 @@ class ZhiyunScraper:
                     "//span[contains(.,'一级赛事')]",
                 ]
                 primary_btn = None
-                for xpath in primary_selectors:
-                    try:
-                        els = self.driver.find_elements(By.XPATH, xpath)
+                def _find_primary(d):
+                    for xpath in primary_selectors:
+                        try:
+                            els = d.find_elements(By.XPATH, xpath)
+                        except Exception:
+                            continue
                         for el in els:
-                            if el.is_displayed() and el.is_enabled():
-                                primary_btn = el
-                                break
-                        if primary_btn:
-                            break
-                    except Exception:
-                        continue
+                            try:
+                                if el.is_displayed() and el.is_enabled():
+                                    return el
+                            except Exception:
+                                continue
+                    return False
+
+                try:
+                    primary_btn = dialog_wait.until(_find_primary)
+                except TimeoutException:
+                    primary_btn = None
                 if not primary_btn:
                     raise ValueError("弹窗内未找到「一级赛事」")
                 self._scroll_into_view_and_click(primary_btn)
-                time.sleep(0.5)
 
                 # 3) 点「关闭」：优先找弹窗内的（含「赛事选择」的容器内的关闭）
                 close_selectors = [
@@ -291,14 +330,18 @@ class ZhiyunScraper:
                 if not close_btn:
                     raise ValueError("未找到「关闭」按钮")
                 self._scroll_into_view_and_click(close_btn)
-                time.sleep(WAIT_TABLE_REFRESH)
+                # 关闭后等待表格刷新完成（行数收敛），避免固定 sleep
+                try:
+                    self._wait_until_match_row_count_at_most(300)
+                except Exception:
+                    pass
                 print("已选「一级赛事」并关闭赛事选择")
                 return
             except Exception as e:
-                if attempt == 0:
-                    time.sleep(1.0)
-                    continue
-                print(f"赛事选择/一级赛事 未应用（{e}），继续用当前列表", file=__import__("sys").stderr)
+                ts = _now_in_tz().strftime("%Y-%m-%d %H:%M:%S")
+                logging.getLogger("crawl").warning(
+                    "%s 赛事选择/一级赛事 未应用（%s），继续用当前列表", ts, e
+                )
                 return
 
     def _count_hidden_rows_in_table(self):
@@ -416,7 +459,7 @@ class ZhiyunScraper:
             except Exception:
                 pass
 
-            time.sleep(2.0)
+            self._wait_page_loaded()
 
             # 若当前页为盘路/资料库页，尝试跳转到对应的 1x2 百家欧指页面
             try:
@@ -447,7 +490,7 @@ class ZhiyunScraper:
                         WebDriverWait(self.driver, WAIT_ELEMENT).until(
                             EC.presence_of_element_located((By.TAG_NAME, 'body'))
                         )
-                        time.sleep(2.0)
+                        self._wait_page_loaded()
             except Exception:
                 pass
 
@@ -468,9 +511,7 @@ class ZhiyunScraper:
                     WebDriverWait(self.driver, WAIT_ELEMENT).until(
                         EC.presence_of_element_located((By.TAG_NAME, 'body'))
                     )
-                    time.sleep(2.0)
-
-            time.sleep(2.5)  # 详情页可能较慢，多等一会
+                    self._wait_page_loaded()
 
             # 之前尝试过在详情页直接拼出 ExportExcelNew.aspx 的 URL 再用 requests 下载，
             # 但实际运行中返回了站内 404 页面（虽然 HTTP 状态码为 200），导致保存的 xls 无法打开。
@@ -589,7 +630,6 @@ class ZhiyunScraper:
                 before_files = set()
 
             logging.getLogger("crawl").info("开始下载第 %d 场 Excel: %s vs %s", index, home, away)
-            time.sleep(1.5)  # 详情页表格/脚本可能较晚渲染，多等一会再找 downobj
             try:
                 clicked = self.driver.execute_script("""
                     var el = document.getElementById('downobj');
@@ -625,7 +665,6 @@ class ZhiyunScraper:
                     except Exception:
                         pass
                 print(f"  点击导出时异常（仍会尝试移动已下载文件）: {click_err}", file=__import__("sys").stderr)
-            time.sleep(2.0)
             try:
                 self._rename_latest_download_in_dir(home, away, target_dir, before_files, time_suffix)
             except Exception as move_err:
@@ -715,9 +754,9 @@ class ZhiyunScraper:
     ):
         """在指定目录内等待新出现的 .xls 并重命名为 主队 VS 客队{time_suffix}.xls（不跨目录移动）。"""
         try:
-            deadline = time.time() + 60  # 最多等 60 秒
+            # 为避免单场比赛下载卡住太久，将等待上限从 60 秒缩短为 30 秒。
+            deadline = time.time() + 30
             new_path = None
-            last_seen = []
 
             while time.time() < deadline:
                 try:
@@ -729,7 +768,6 @@ class ZhiyunScraper:
                 except Exception:
                     time.sleep(1.0)
                     continue
-                last_seen = current
                 added = [f for f in current if f not in before_files]
                 if added:
                     candidates = [
@@ -739,14 +777,10 @@ class ZhiyunScraper:
                     break
                 time.sleep(1.0)
 
-            if not new_path and last_seen:
-                candidates = [
-                    os.path.join(target_dir, f) for f in last_seen
-                ]
-                new_path = max(candidates, key=os.path.getmtime)
-
             if not new_path:
-                print("未发现新下载的 Excel 文件，跳过重命名")
+                logging.getLogger("crawl").warning(
+                    "在 30 秒内未检测到新增 Excel 文件（%s vs %s），跳过重命名", home, away
+                )
                 return
 
             safe_home = self._safe_name(home)
@@ -779,7 +813,8 @@ class ZhiyunScraper:
         if not text:
             text = self.driver.execute_script("return arguments[0].textContent", cell) or ""
             text = text.strip()
-        return text
+        # 将单元格中的换行/tab 等压缩为单个空格，避免日志被拆成多行
+        return " ".join(text.split())
 
     def _preview_row(self, row):
         """打印该行前几列文本，用于排查“无欧链接”的行是表头还是异常数据。"""

@@ -52,7 +52,10 @@ def _setup_logging():
     ch.setFormatter(fmt)
     logger.addHandler(ch)
 
-    logger.info("主流程日志文件: %s", log_path)
+    # 仅打印相对路径，避免日志中带上 /Users/... 前缀
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    rel_log_path = os.path.relpath(log_path, project_root)
+    logger.info("主流程日志文件: %s", rel_log_path)
     return logger
 
 

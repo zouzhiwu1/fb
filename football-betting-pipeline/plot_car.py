@@ -203,7 +203,10 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         # 提升 dpi 以在手机端放大时保持清晰
         plt.savefig(out_path, dpi=200, bbox_inches="tight")
         plt.close()
-        log.info("  已生成: %s", out_path)
+        # 日志中仅输出相对于项目根目录的路径，避免打印绝对路径（如 /Users/...）
+        project_root = os.path.abspath(os.path.join(project_dir, os.pardir))
+        rel_path = os.path.relpath(out_path, project_root)
+        log.info("已生成: %s", rel_path)
         count += 1
 
     return count

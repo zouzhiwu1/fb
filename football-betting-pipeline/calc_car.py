@@ -49,7 +49,10 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    logger.info("日志文件: %s", log_path)
+    # 日志中只打印相对路径，避免带上 /Users/... 这样的前缀
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    rel_log_path = os.path.relpath(log_path, project_root)
+    logger.info("日志文件: %s", rel_log_path)
     return logger
 
 
@@ -144,7 +147,9 @@ def run(data_dir: str, project_dir: str) -> None:
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         header_df.to_excel(writer, sheet_name="Sheet1", index=False, header=False)
         data_df.to_excel(writer, sheet_name="Sheet1", index=False, header=False, startrow=len(header_df))
-    logging.getLogger("calc_car").info("已按 2.2 节计算，共 %d 组 -> %s", len(results), out_path)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    rel_out_path = os.path.relpath(out_path, project_root)
+    logging.getLogger("calc_car").info("已按 2.2 节计算，共 %d 组 -> %s", len(results), rel_out_path)
 
 
 def _resolve_data_dir(raw_arg: str) -> str:
