@@ -7,6 +7,7 @@ import pytest
 from plot_car import (
     _safe_filename,
     _to_float,
+    _time_point_to_mmddhh,
     _compute_prediction,
     _resolve_data_dir,
     _setup_logging,
@@ -42,6 +43,14 @@ def test_to_float_converts_and_preserves_nan():
     out = _to_float(s)
     assert list(out[:2]) == [1.5, 2.0]
     assert pd.isna(out.iloc[2])
+
+
+def test_time_point_to_mmddhh():
+    """时间点 YYYYMMDDHH 显示为 MMDDHH。"""
+    assert _time_point_to_mmddhh("2026031413") == "031413"
+    assert _time_point_to_mmddhh("2026030812") == "030812"
+    assert _time_point_to_mmddhh("031413") == "031413"  # 不足 10 位原样返回
+    assert _time_point_to_mmddhh("") == ""
 
 
 def test_compute_prediction_ascending_order():
@@ -90,7 +99,7 @@ def test_plot_match_curves_generates_images(tmp_path, monkeypatch):
     report_dir = tmp_path / "report" / "20260308"
     report_dir.mkdir(parents=True)
     # CAR: 2 行表头 + 2 行数据（同一场比赛两个时间点）
-    car = report_dir / "CAR20260308.xlsx"
+    car = report_dir / "car_20260308.xlsx"
     df = pd.DataFrame([
         ["主队", "客队", "时间", "D", "E", "F", "G", "H", "I", "J", "K", "L"],
         ["", "", "", "", "", "", "", "", "", "", "", ""],
@@ -100,7 +109,7 @@ def test_plot_match_curves_generates_images(tmp_path, monkeypatch):
     df.to_excel(car, header=False, index=False)
     n = plot_match_curves(str(data_dir), str(tmp_path))
     assert n == 1
-    imgs = list(report_dir.glob("*_曲线.png"))
+    imgs = list(report_dir.glob("*_VS_*.png"))
     assert len(imgs) == 1
 
 
@@ -108,7 +117,7 @@ def test_plot_match_curves_no_data_returns_zero(tmp_path, monkeypatch):
     monkeypatch.setattr("plot_car.REPORT_DIR", str(tmp_path))
     (tmp_path / "20260308").mkdir(parents=True)
     report_dir = tmp_path / "20260308"
-    car = report_dir / "CAR20260308.xlsx"
+    car = report_dir / "car_20260308.xlsx"
     pd.DataFrame([["H1"] * 12, ["H2"] * 12]).to_excel(car, header=False, index=False)  # 仅表头
     n = plot_match_curves(str(tmp_path / "20260308"), str(tmp_path))
     assert n == 0
@@ -146,7 +155,7 @@ def test_main_success_generates_curves(monkeypatch, tmp_path):
     data_dir.mkdir()
     report_dir = tmp_path / "report" / "20260308"
     report_dir.mkdir(parents=True)
-    car = report_dir / "CAR20260308.xlsx"
+    car = report_dir / "car_20260308.xlsx"
     pd.DataFrame([
         ["主队", "客队", "时间", "D", "E", "F", "G", "H", "I", "J", "K", "L"],
         ["", "", "", "", "", "", "", "", "", "", "", ""],
@@ -154,5 +163,5 @@ def test_main_success_generates_curves(monkeypatch, tmp_path):
     ]).to_excel(car, header=False, index=False)
     monkeypatch.setattr("sys.argv", ["plot_car.py", "2026030812", "2026030911"])
     main()
-    assert len(list(report_dir.glob("*_曲线.png"))) == 1
+    assert len(list(report_dir.glob("*_VS_*.png"))) == 1
 

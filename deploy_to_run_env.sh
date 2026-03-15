@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 将开发环境（/Users/zhiwuzou/Documents/cursor/football-betting）中的代码项目
-# 同步到运行环境（/Users/zhiwuzou/Documents/app/football-betting），供定时器使用。
+# 同步到运行环境（/Users/zhiwuzou/app/football-betting），供定时器使用。
 # 仅同步代码/文档目录：
 #   - football-betting-doc
 #   - football-betting-pipeline
@@ -16,7 +16,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_ROOT="$SCRIPT_DIR"
-RUN_ROOT="/Users/zhiwuzou/Documents/app/football-betting"
+RUN_ROOT="/Users/zhiwuzou/app/football-betting"
 
 CODE_DIRS=(
   football-betting-pipeline
@@ -24,7 +24,7 @@ CODE_DIRS=(
   football-betting-mobile
 )
 
-EXCLUDE="--exclude=.git --exclude=__pycache__ --exclude=.pytest_cache --exclude=.coverage --exclude=.venv --exclude=.DS_Store --exclude=*.pyc --exclude=com.football.betting.pipeline.plist"
+EXCLUDE="--exclude=.git --exclude=__pycache__ --exclude=.pytest_cache --exclude=.coverage --exclude=.venv --exclude=.DS_Store --exclude=*.pyc --exclude=com.football.betting.run_real.plist"
 
 echo "===> 开发环境: $DEV_ROOT"
 echo "===> 运行环境: $RUN_ROOT"
@@ -62,12 +62,12 @@ fi
 echo ""
 echo "===> 根据 RUN_ROOT 生成 LaunchAgent plist（避免写死路径）..."
 if [[ -x "$RUN_PIPELINE/gen_launchd_plist.sh" ]]; then
-  RUN_ROOT="$RUN_ROOT" "$RUN_PIPELINE/gen_launchd_plist.sh" > "$RUN_PIPELINE/com.football.betting.pipeline.plist"
-  echo "已生成: $RUN_PIPELINE/com.football.betting.pipeline.plist"
+  RUN_ROOT="$RUN_ROOT" "$RUN_PIPELINE/gen_launchd_plist.sh" > "$RUN_PIPELINE/com.football.betting.run_real.plist"
+  echo "已生成: $RUN_PIPELINE/com.football.betting.run_real.plist"
 else
   echo "未找到 gen_launchd_plist.sh，跳过 plist 生成"
 fi
 
 echo ""
-echo "部署完成。定时器将执行: $RUN_PIPELINE/main.py"
-echo "如需加载定时器: cp $RUN_PIPELINE/com.football.betting.pipeline.plist ~/Library/LaunchAgents/ && launchctl bootout gui/\$(id -u)/com.football.betting.pipeline 2>/dev/null; launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.football.betting.pipeline.plist"
+echo "部署完成。定时器将执行: $RUN_PIPELINE/run_real.py（即时流程）、$RUN_PIPELINE/run_final.py（完场流程，若已配置）"
+echo "如需加载定时器: cp $RUN_PIPELINE/com.football.betting.run_real.plist ~/Library/LaunchAgents/ && launchctl bootout gui/\$(id -u)/com.football.betting.run_real 2>/dev/null; launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.football.betting.run_real.plist"

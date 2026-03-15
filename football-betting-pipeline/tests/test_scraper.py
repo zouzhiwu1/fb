@@ -2,7 +2,7 @@
 """爬虫状态过滤等逻辑的单元测试。"""
 import pytest
 
-from scraper import ZhiyunScraper
+from scraper_real import ZhiyunScraper
 
 
 def test_is_status_empty_accepts_empty():

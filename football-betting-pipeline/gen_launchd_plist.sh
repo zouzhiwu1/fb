@@ -7,7 +7,7 @@
 #   或
 #   ./gen_launchd_plist.sh /path/to/football-betting
 #
-# 输出到 stdout，部署时可重定向到 com.football.betting.pipeline.plist
+# 输出到 stdout，部署时可重定向到 com.football.betting.run_real.plist
 
 set -e
 
@@ -20,8 +20,8 @@ RUN_ROOT="$(cd "$RUN_ROOT" 2>/dev/null && pwd || echo "$RUN_ROOT")"
 PIPELINE="$RUN_ROOT/football-betting-pipeline"
 LOG_DIR="$RUN_ROOT/football-betting-log"
 PYTHON="$PIPELINE/.venv/bin/python"
-LOG="$LOG_DIR/football-betting-main.log"
-ERR="$LOG_DIR/football-betting-main.err"
+LOG="$LOG_DIR/football-betting-run-real.log"
+ERR="$LOG_DIR/football-betting-run-real.err"
 
 cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,11 +29,11 @@ cat <<EOF
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.football.betting.pipeline</string>
+  <string>com.football.betting.run_real</string>
   <key>ProgramArguments</key>
   <array>
     <string>$PYTHON</string>
-    <string>main.py</string>
+    <string>run_real.py</string>
   </array>
   <key>WorkingDirectory</key>
   <string>$PIPELINE</string>

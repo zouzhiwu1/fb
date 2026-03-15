@@ -185,7 +185,7 @@ def test_parse_time_arg_invalid_exits():
 
 
 def test_merge_data_main_success(tmp_path, monkeypatch):
-    """main() 在有效参数和已有 xls 下合并并写出 Master CSV。"""
+    """main() 在有效参数和已有 xls 下合并并写出 master CSV。"""
     import merge_data
     monkeypatch.setattr(merge_data, "__file__", str(tmp_path / "merge_data.py"))
     monkeypatch.setattr(merge_data, "DOWNLOAD_DIR", str(tmp_path))
@@ -200,7 +200,7 @@ def test_merge_data_main_success(tmp_path, monkeypatch):
     (date_dir / "A VS B2026030812.xls").write_text("<table>" + trs + "</table>", encoding="utf-8")
     monkeypatch.setattr("sys.argv", ["merge_data.py", "2026030812", "2026030812"])
     merge_data.main()
-    master = date_dir / "Master20260308.csv"
+    master = date_dir / "master_20260308.csv"
     assert master.exists()
     content = master.read_text(encoding="utf-8-sig")
     assert "A" in content and "B" in content

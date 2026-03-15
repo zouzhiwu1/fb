@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "main.py (爬虫入口)",
+            "name": "run_real.py (即时流程入口)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/run_real.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
         },

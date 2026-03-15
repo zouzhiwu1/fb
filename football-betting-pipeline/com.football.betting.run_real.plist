@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.football.betting.run_real</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/zhiwuzou/Documents/cursor/football-betting-pipeline/.venv/bin/python</string>
+    <string>run_real.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/zhiwuzou/Documents/cursor/football-betting-pipeline</string>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/Users/zhiwuzou/Documents/cursor/football-betting-log/football-betting-run-real.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/zhiwuzou/Documents/cursor/football-betting-log/football-betting-run-real.err</string>
+</dict>
+</plist>

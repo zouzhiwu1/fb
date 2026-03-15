@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-批处理3：根据综合评估表（CAR{YYYYMMDD}.xlsx）生成欧赔指数曲线图和凯利指数曲线图。
+批处理3：根据综合评估表（car_{YYYYMMDD}.xlsx）生成欧赔指数曲线图和凯利指数曲线图。
 参见 design.md 第 3.3 节。
 详细日志写入 logs/plot_car{YYYYMMDDHH}.log。
 
@@ -16,7 +16,7 @@
 说明：
 - 实际使用的逻辑日期与 merge_data.py 一致：使用起始时间所在日期 YYYYMMDD。
 - 输出图片保存在对应报告目录 REPORT_DIR/{YYYYMMDD}/ 下，
-  文件名：{主队}_VS_{客队}_曲线.png
+  文件名：{主队}_VS_{客队}.png
 """
 import datetime
 import logging
@@ -60,7 +60,9 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    logger.info("日志文件: %s", log_path)
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    rel_log_path = os.path.relpath(log_path, _display_root)
+    logger.info("日志文件: %s", rel_log_path)
     return logger
 
 
@@ -96,6 +98,14 @@ def _to_float(series: pd.Series):
     return pd.to_numeric(series, errors="coerce")
 
 
+def _time_point_to_mmddhh(time_str: str) -> str:
+    """将 YYYYMMDDHH 转为 MMDDHH 显示；不足 10 位则原样返回。"""
+    s = (time_str or "").strip()
+    if len(s) >= 10 and s[:10].isdigit():
+        return s[4:10]  # MMDDHH
+    return s
+
+
 def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
     """
     预测结果算法（design.md 3.3.3）：
@@ -122,14 +132,14 @@ def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
 
 def plot_match_curves(data_dir: str, project_dir: str) -> int:
     """
-    读取 REPORT_DIR/{YYYYMMDD}/ 下的 CAR{YYYYMMDD}.xlsx，按（主队、客队）分组，
+    读取 REPORT_DIR/{YYYYMMDD}/ 下的 car_{YYYYMMDD}.xlsx，按（主队、客队）分组，
     为每场比赛生成一张图，包含欧赔指数曲线图与凯利指数曲线图两个子图；
     图片写入 REPORT_DIR/{YYYYMMDD}/。
     返回成功生成的图片数量。
     """
     folder_name = os.path.basename(data_dir.rstrip(os.sep))
     report_dir = os.path.join(REPORT_DIR, folder_name)
-    car_path = os.path.join(report_dir, f"CAR{folder_name}.xlsx")
+    car_path = os.path.join(report_dir, f"car_{folder_name}.xlsx")
     if not os.path.isfile(car_path):
         raise FileNotFoundError(f"综合评估表不存在，请先执行 calc_car.py: {car_path}")
 
@@ -155,20 +165,32 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         home_str = str(home).strip()
         away_str = str(away).strip()
         prediction = _compute_prediction(grp, data)
-        title_line1 = f"{home_str} VS {away_str}"
-        title_line2 = f"预测结果：{prediction}"
+        times = grp[data.columns[COL_TIME]].astype(str).tolist()
+        # 时间点范围：起始～终止，格式 YYYYMMDDHH；不足 10 位则原样显示
+        def _to_yyyymmddhh(t: str) -> str:
+            s = (t or "").strip()
+            if len(s) >= 10 and s[:10].isdigit():
+                return s[:10]
+            return s
+        start_ts = _to_yyyymmddhh(times[0]) if times else ""
+        end_ts = _to_yyyymmddhh(times[-1]) if times else ""
+        time_range_str = f"时间点：{start_ts}～{end_ts}" if (start_ts and end_ts) else "时间点：—"
+        times_display = [_time_point_to_mmddhh(t) for t in times]
 
         # 为手机端展示优化：偏竖屏比例、较高分辨率，便于在窄屏上查看
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 10))
-        fig.suptitle(title_line1 + "\n" + title_line2, fontsize=14)
+        fig.suptitle(f"{home_str} VS {away_str}", fontsize=14, fontweight="bold", y=0.99)
+        # 左上角：时间点范围、预测结果（置于主标题与欧赔曲线图之间的空隙，对齐虚线框）
+        fig.text(0.02, 0.96, f"{time_range_str}\n预测结果：{prediction}", fontsize=11,
+                 verticalalignment="top", horizontalalignment="left",
+                 transform=fig.transFigure)
 
         # ---------- 欧赔指数曲线图 ----------
         # 第 1 节点：初指 D/E/F；第 2～N+1 节点：即时 G/H/I（N = 该场比赛时间点数量，由表决定）
         init_main = grp.iloc[0][data.columns[COL_INIT_MAIN]]
         init_draw = grp.iloc[0][data.columns[COL_INIT_DRAW]]
         init_away = grp.iloc[0][data.columns[COL_INIT_AWAY]]
-        times = grp[data.columns[COL_TIME]].astype(str).tolist()
-        x_labels = ["初指"] + times
+        x_labels = ["初指"] + times_display
         x_pos = list(range(len(x_labels)))
 
         y_main = [init_main] + grp[data.columns[COL_LIVE_MAIN]].tolist()
@@ -215,23 +237,23 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
             markersize=5,
         )
         ax2.set_xticks(x_kelly)
-        ax2.set_xticklabels(times, rotation=45, ha="right")
+        ax2.set_xticklabels(times_display, rotation=45, ha="right")
         ax2.set_xlabel("时间点", fontsize=11)
         ax2.set_ylabel("凯利指数", fontsize=11)
         ax2.set_title("凯利指数曲线图", fontsize=12)
         ax2.legend(loc="best")
         ax2.grid(True, alpha=0.3)
 
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.86])
         os.makedirs(report_dir, exist_ok=True)
-        safe_name = f"{_safe_filename(home_str)}_VS_{_safe_filename(away_str)}_曲线.png"
+        safe_name = f"{_safe_filename(home_str)}_VS_{_safe_filename(away_str)}.png"
         out_path = os.path.join(report_dir, safe_name)
         # 提升 dpi 以在手机端放大时保持清晰
         plt.savefig(out_path, dpi=200, bbox_inches="tight")
         plt.close()
-        # 日志中仅输出相对于项目根目录的路径，避免打印绝对路径（如 /Users/...）
-        project_root = os.path.abspath(os.path.join(project_dir, os.pardir))
-        rel_path = os.path.relpath(out_path, project_root)
+        # 相对路径以「工作目录上一级」为根，显示为 football-betting/football-betting-*
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        rel_path = os.path.relpath(out_path, _display_root)
         log.info("已生成: %s", rel_path)
         count += 1
 
@@ -250,7 +272,9 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, removed)
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
+        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
     _setup_chinese_font()
 
     args = sys.argv[1:]

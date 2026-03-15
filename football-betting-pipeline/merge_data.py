@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 批处理1（与批处理2 calc_car.py 分开）：将指定时间段内的 .xls 数据文件
-按文件名排序后合并为一个一览表，输出文件名为 Master{YYYYMMDD}.csv。
+按文件名排序后合并为一个一览表，输出文件名为 master_{YYYYMMDD}.csv。
 
 新版本约定：
 - crawl_real.py 下载文件时只按“自然日”建目录（YYYYMMDD），与临界点无关。
@@ -47,9 +47,11 @@ DATA_START_ROW = 5
 # 即源列索引 2,3,4,5,6,7,11,12,13
 SOURCE_COL_INDICES = [2, 3, 4, 5, 6, 7, 11, 12, 13]
 
-# 文件名正则：{主队} VS {客队}{YYYYMMDDHH}.xls，末尾为 10 位数字（年月日时）
-# 客队用贪婪 (.+) 以便队名含数字（如 U19、U20）时仍能正确截出末尾 10 位时间
-FILENAME_PATTERN = re.compile(r"^(.+?)\s+VS\s+(.+)(\d{10})\.xls$", re.IGNORECASE)
+# 文件名正则：支持两种格式（新格式优先）
+# 新：{主队}_VS_{客队}_{YYYYMMDDHH}.xls
+# 旧：{主队} VS {客队}{YYYYMMDDHH}.xls
+FILENAME_PATTERN_NEW = re.compile(r"^(.+?)_VS_(.+)_(\d{10})\.xls$", re.IGNORECASE)
+FILENAME_PATTERN_OLD = re.compile(r"^(.+?)\s+VS\s+(.+)(\d{10})\.xls$", re.IGNORECASE)
 
 
 def _setup_logging():
@@ -69,25 +71,25 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    # 日志中只打印相对路径，避免带上 /Users/... 这样的前缀
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    rel_log_path = os.path.relpath(log_path, project_root)
+    # 相对路径以「工作目录上一级」为根，显示为 football-betting/football-betting-*
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    rel_log_path = os.path.relpath(log_path, _display_root)
     logger.info("日志文件: %s", rel_log_path)
     return logger
 
 
 def parse_filename(basename: str):
-    """解析文件名，返回 (主队, 客队, 时间点)。时间点为 YYYYMMDDHH（10 位）。无法解析时返回 None。"""
+    """解析文件名，返回 (主队, 客队, 时间点)。时间点为 YYYYMMDDHH（10 位）。支持 主队_VS_客队_YYYYMMDDHH.xls 与旧格式。无法解析时返回 None。"""
     # macOS 可能返回 NFD 形式，统一规范为 NFC 再匹配
     name = unicodedata.normalize("NFC", basename.strip())
-    m = FILENAME_PATTERN.match(name)
-    if not m:
-        return None
-    home = m.group(1).strip()
-    away = m.group(2).strip()
-    yyyymmddhh = m.group(3)
-    time_point = yyyymmddhh  # YYYYMMDDHH（10 位）
-    return home, away, time_point
+    for pattern in (FILENAME_PATTERN_NEW, FILENAME_PATTERN_OLD):
+        m = pattern.match(name)
+        if m:
+            home = m.group(1).strip()
+            away = m.group(2).strip()
+            yyyymmddhh = m.group(3)
+            return home, away, yyyymmddhh
+    return None
 
 
 def _time_point_to_datetime(time_point: str):
@@ -116,7 +118,7 @@ def _parse_time_arg(arg: str, name: str, log: logging.Logger):
     return dt
 
 
-def _collect_files_in_range(start_dt, end_dt, log: logging.Logger):
+def _collect_files_in_range(start_dt, end_dt, log: logging.Logger, display_root: str = None):
     """
     在 [start_dt, end_dt] 区间内收集需要合并的 .xls 文件。
 
@@ -130,7 +132,8 @@ def _collect_files_in_range(start_dt, end_dt, log: logging.Logger):
     files: list[tuple[str, str, str, str, str]] = []
     root = os.path.abspath(DOWNLOAD_DIR)
     if not os.path.isdir(root):
-        log.info("下载根目录不存在: %s", root)
+        _p = os.path.relpath(root, display_root) if display_root else root
+        log.info("下载根目录不存在: %s", _p)
         return files
 
     for name in sorted(os.listdir(root)):
@@ -142,12 +145,14 @@ def _collect_files_in_range(start_dt, end_dt, log: logging.Logger):
                 continue
             parsed = parse_filename(fname)
             if not parsed:
-                log.info("跳过（文件名无法解析）: %s", os.path.join(dir_path, fname))
+                _p = os.path.relpath(os.path.join(dir_path, fname), display_root) if display_root else os.path.join(dir_path, fname)
+                log.info("跳过（文件名无法解析）: %s", _p)
                 continue
             home, away, time_point = parsed
             dt = _time_point_to_datetime(time_point)
             if dt is None:
-                log.info("跳过（时间点无法解析）: %s", os.path.join(dir_path, fname))
+                _p = os.path.relpath(os.path.join(dir_path, fname), display_root) if display_root else os.path.join(dir_path, fname)
+                log.info("跳过（时间点无法解析）: %s", _p)
                 continue
             if start_dt <= dt <= end_dt:
                 files.append((dir_path, fname, home, away, time_point))
@@ -247,13 +252,14 @@ def get_csv_headers(project_dir: str):
 
 def main():
     log = _setup_logging()
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, removed)
+        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
+        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
     # 确认实际执行的脚本路径（若看不到“原因”等输出，请检查是否运行了其他目录下的脚本）
     _script_path = os.path.abspath(__file__)
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    rel_script_path = os.path.relpath(_script_path, project_root)
+    rel_script_path = os.path.relpath(_script_path, _display_root)
     log.info("[merge_data] 正在执行: %s", rel_script_path)
 
     # 新版本：必须显式传入起始、终止时间点两个参数（YYYYMMDDHH、YYYYMMDDHH）
@@ -271,12 +277,12 @@ def main():
         log.error("起始时间晚于终止时间: %s > %s", start_arg, end_arg)
         sys.exit(1)
 
-    files = _collect_files_in_range(start_dt, end_dt, log)
+    files = _collect_files_in_range(start_dt, end_dt, log, display_root=_display_root)
     if not files:
         log.warning("在区间 [%s, %s] 内没有匹配的 .xls 文件", start_arg, end_arg)
         sys.exit(0)
 
-    # 输出目录和文件名：放在起始时间所在日期目录下，命名为 Master{YYYYMMDD}.csv
+    # 输出目录和文件名：放在起始时间所在日期目录下，命名为 master_{YYYYMMDD}.csv
     logical_date = start_dt.strftime("%Y%m%d")
     output_dir = os.path.abspath(os.path.join(DOWNLOAD_DIR, logical_date))
     os.makedirs(output_dir, exist_ok=True)
@@ -300,8 +306,8 @@ def main():
     # 工程目录：本脚本所在目录
     project_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # 一览表文件名：Master{YYYYMMDD}.csv（按起始时间所在日期命名）
-    output_path = os.path.join(output_dir, f"Master{folder_label}.csv")
+    # 一览表文件名：master_{YYYYMMDD}.csv（按起始时间所在日期命名）
+    output_path = os.path.join(output_dir, f"master_{folder_label}.csv")
 
     try:
         header_row1, header_row2 = get_csv_headers(project_dir)
@@ -337,7 +343,8 @@ def main():
                     try:
                         with open(error_log_path, "a", encoding="utf-8") as f:
                             f.write(block)
-                        log.info("  错误已追加到: %s", error_log_path)
+                        _rel_err = os.path.relpath(error_log_path, _display_root)
+                        log.info("  错误已追加到: %s", _rel_err)
                     except Exception:
                         pass
             continue
@@ -350,7 +357,7 @@ def main():
         w.writerow(header_row1)
         w.writerow(header_row2)
         w.writerows(rows)
-    rel_output = os.path.relpath(output_path, project_root)
+    rel_output = os.path.relpath(output_path, _display_root)
     log.info("已合并 %d 个文件，共 %d 行 -> %s", len(files), len(rows), rel_output)
 
 

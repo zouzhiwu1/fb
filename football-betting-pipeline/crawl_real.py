@@ -15,7 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from config import BASE_URL, DOWNLOAD_DIR, HEADLESS, DEBUG_LOG_DIR, LOG_RETENTION_DAYS
 from log_cleanup import delete_old_logs
-from scraper import ZhiyunScraper
+from scraper_real import ZhiyunScraper
 
 
 def _setup_logging():
@@ -35,7 +35,9 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    logger.info("日志文件: %s", log_path)
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    rel_log_path = os.path.relpath(log_path, _display_root)
+    logger.info("日志文件: %s", rel_log_path)
     return logger
 
 
@@ -98,12 +100,14 @@ def main():
     说明：
     - 目前 crawl_real.py 实际仍按「执行当下的实时盘口」抓取，不依赖传入时间点，
       这里的起始/终止时间主要用于与 merge_data.py 等脚本保持一致的调用方式，
-      便于 main.py 统一管理参数，避免混淆。
+      便于 run_real.py 统一管理参数，避免混淆。
     """
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, removed)
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
+        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 
     args = sys.argv[1:]
     if len(args) != 2 or not all(len(a) == 10 and a.isdigit() for a in args):

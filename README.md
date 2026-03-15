@@ -24,7 +24,8 @@
 football-betting/
 ├── README.md                    # 本文件
 ├── football-betting-pipeline/   # 模块 1：爬虫 + 合并 + 计算 + 曲线图
-│   ├── main.py                  # 主流程入口（crawl → merge → calc → plot）
+│   ├── run_real.py              # 即时流程入口（crawl_real → merge_data → calc_car → plot_car）
+│   ├── run_final.py             # 完场流程入口（crawl_final → add_score_to_image）
 │   ├── crawl_real.py, merge_data.py, calc_car.py, plot_car.py
 │   ├── config.py                # 配置（可被环境变量 / .env 覆盖）
 │   ├── requirements.txt
@@ -43,7 +44,7 @@ football-betting/
 ├── football-betting-doc/        # 设计/架构文档
 ├── football-betting-data/       # 数据目录（爬虫 .xls、Master*.csv，按需创建或由 WORK_SPACE 指定）
 ├── football-betting-report/    # 报告目录（CAR*.xlsx、*_曲线.png，按需创建）
-└── football-betting-log/       # 日志目录（main_*.log 等，按需创建）
+└── football-betting-log/       # 日志目录（run_real_*.log、run_final_*.log 等，按需创建）
 ```
 
 `football-betting-data`、`football-betting-report`、`football-betting-log` 可由环境变量指定到其它路径，见下文「环境变量」。
@@ -80,14 +81,14 @@ football-betting/
 
    ```bash
    # 自动按当前时间计算统计区间并执行：抓取 → 合并 → 计算 → 曲线图
-   python main.py
+   python run_real.py
 
    # 或指定时间区间（YYYYMMDDHH 各 10 位）
-   python main.py 2026031312 2026031411
+   python run_real.py 2026031312 2026031411
    ```
 
 4. **定时任务**  
-   建议用系统定时任务在固定整点执行 `python main.py`（如 2、4、6、13、15、17、19、21、23 点）。Windows 用「任务计划程序」，macOS 用 launchd，Linux 用 cron。详细步骤见 [football-betting-pipeline/README.md](football-betting-pipeline/README.md)。
+   建议用系统定时任务在固定整点执行 `python run_real.py`（如 2、4、6、13、15、17、19、21、23 点）；完场流程（抓完场比分并写入图片）可每天 13 点执行 `python run_final.py`。Windows 用「任务计划程序」，macOS 用 launchd，Linux 用 cron。详细步骤见 [football-betting-pipeline/README.md](football-betting-pipeline/README.md)。
 
 ---
 
@@ -169,7 +170,7 @@ npx expo start
 
 ## 部署要点
 
-- **模块 1**：无 Web 服务，仅通过定时任务或命令行执行 `python main.py`。生产环境建议用 cron（Linux）或 launchd（macOS）在指定整点运行，并保证 `WORK_SPACE`（或各目录）指向持久化磁盘。
+- **模块 1**：无 Web 服务，仅通过定时任务或命令行执行 `python run_real.py`（即时流程）或 `python run_final.py`（完场流程）。生产环境建议用 cron（Linux）或 launchd（macOS）在指定整点运行，并保证 `WORK_SPACE`（或各目录）指向持久化磁盘。
 - **模块 2**：生产环境建议用 gunicorn/uWSGI 等托管 Flask，并配置 Nginx 反向代理；务必修改 `DATABASE_URL`、`JWT_SECRET_KEY`，并配置好 `CURVE_IMAGE_DIR` 以便曲线图查询。
 - **模块 3**：按 Expo/React Native 流程打包为 Android/iOS 安装包，在 App 内配置生产环境 API 地址。
 

@@ -9,7 +9,7 @@
 - **职责**：抓取智云比分数据 → 合并、计算 → 生成曲线图图片。
 - **产出**：按日期目录存放的曲线图文件，例如  
   `{CRAWLER_DOWNLOAD_DIR}/{YYYYMMDD}/{主队}_VS_{客队}_曲线.png`
-- **运行方式**：定时任务执行 `main.py`（crawl → merge_data → calc_car → plot_car），或单独运行各脚本。
+- **运行方式**：定时任务执行 `run_real.py`（crawl → merge_data → calc_car → plot_car），或 `run_final.py`（crawl_final → add_score_to_image）；也可单独运行各脚本。
 - **与模块 2 的关系**：模块 2 可读取上述目录中的图片，对外提供查询接口或页面。
 
 ---

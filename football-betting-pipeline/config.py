@@ -2,8 +2,8 @@
 爬虫配置。可通过环境变量覆盖（若存在 .env 会先加载）：
   WORK_SPACE  工作目录根路径，其下放置 football-betting-data、football-betting-report、football-betting-log 等
   CRAWLER_BASE_URL  页面地址
-  CRAWLER_DOWNLOAD_DIR  下载目录（crawl 的 xls、merge_data 的 Master*.csv）
-  CRAWLER_REPORT_DIR  报告目录（calc_car 的 CAR*.xlsx、plot_car 的 *_曲线.png，其下按 YYYYMMDD 子目录）
+  CRAWLER_DOWNLOAD_DIR  下载目录（crawl 的 xls、merge_data 的 master_{YYYYMMDD}.csv）
+  CRAWLER_REPORT_DIR  报告目录（calc_car 的 car_{YYYYMMDD}.xlsx、plot_car 的 {主队}_VS_{客队}.png，其下按 YYYYMMDD 子目录）
   CRAWLER_CUTOFF_HOUR  跨天时间临界点（时，0～23），默认 12
   CRAWLER_TIMEZONE  用于“当前时间”的时区（决定下载目录/文件名），默认 Asia/Tokyo
   CRAWLER_HEADLESS  设为 1 则无头模式
@@ -32,14 +32,14 @@ DOWNLOAD_DIR = os.environ.get(
     "CRAWLER_DOWNLOAD_DIR",
     os.path.join(WORK_SPACE, "football-betting-data")
 )
-# calc_car.py / plot_car.py 生成文件（CAR*.xlsx、*_曲线.png）的根目录，其下按 YYYYMMDD 建子目录
+# calc_car.py / plot_car.py 生成文件（car_{YYYYMMDD}.xlsx、{主队}_VS_{客队}.png）的根目录，其下按 YYYYMMDD 建子目录
 REPORT_DIR = os.environ.get(
     "CRAWLER_REPORT_DIR",
     os.path.join(WORK_SPACE, "football-betting-report")
 )
 # 跨天时间临界点（时）：当日该时及之后 → 当日文件夹；次日该时之前 → 前一日文件夹
 CUTOFF_HOUR = int(os.environ.get("CRAWLER_CUTOFF_HOUR", "12"))
-# 主流程触发小时（整点，0～23）。main.py 依此计算每次统计区间 [start,end]。
+# 主流程触发小时（整点，0～23）。run_real.py 依此计算每次统计区间 [start,end]。
 # 如需调整定时任务时间，只需修改此处或设置环境变量 CRAWLER_TRIGGER_HOURS（逗号分隔）。
 TRIGGER_HOURS = [
     int(h)
@@ -57,7 +57,7 @@ DEBUG_LOG_DIR = os.environ.get(
 )
 # 日志保留天数：crawl/merge_data/calc_car/plot_car 执行前会删除超过此天数的日志文件
 LOG_RETENTION_DAYS = int(os.environ.get("CRAWLER_LOG_RETENTION_DAYS", "7"))
-# 调试：最多抓取场数，0=不限制；设为 3 时只抓 3 场即结束，便于快速验证 main.py 全流程
+# 调试：最多抓取场数，0=不限制；设为 3 时只抓 3 场即结束，便于快速验证 run_real.py 全流程
 DEBUG_MAX_MATCHES = int(os.environ.get("CRAWLER_DEBUG_MAX_MATCHES", "0"))
 # 调试：仅抓取包含指定关键词的比赛（主队或客队含任一关键词）。
 # 例如: CRAWLER_DEBUG_MATCH_KEYWORDS="帕纳辛纳科斯,里尔,博洛尼亚"
@@ -76,6 +76,7 @@ COL_DATE = 1
 COL_TIME = 2
 COL_STATUS = 3   # 状态列：仅下载状态为空的比赛（空白或「-」），不下载「比赛中」「完」等
 COL_HOME = 4
+COL_SCORE = 5    # 比分列（即时比分/完场比分均用）
 COL_AWAY = 6
 
 # 等待时间（秒）

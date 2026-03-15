@@ -2,7 +2,7 @@
 """
 批处理2（与批处理1 merge_data.py 分开）：按《算法概要》2.2 节，
 在一览文件基础上按「主队、客队、时间点」分组，对 D～L 列计算综合评估值：
-D～I 列用 (MAX-MIN)/AVERAGE，J、K、L 列用 VARP(列)*100。输出 CAR{YYYYMMDD}.xlsx。
+D～I 列用 (MAX-MIN)/AVERAGE，J、K、L 列用 VARP(列)*100。输出 car_{YYYYMMDD}.xlsx。
 详细日志写入 logs/calc_car{YYYYMMDDHH}.log。
 依赖：需先对同一目录执行批处理1（merge_data.py）生成一览 CSV。
 
@@ -49,9 +49,9 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    # 日志中只打印相对路径，避免带上 /Users/... 这样的前缀
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    rel_log_path = os.path.relpath(log_path, project_root)
+    # 相对路径以「工作目录上一级」为根，显示为 football-betting/football-betting-*
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    rel_log_path = os.path.relpath(log_path, _display_root)
     logger.info("日志文件: %s", rel_log_path)
     return logger
 
@@ -85,12 +85,12 @@ def compute_varp_100(series: pd.Series) -> float:
 
 def run(data_dir: str, project_dir: str) -> None:
     """
-    从 data_dir 下读取 Master{folder_name}.csv，按 (主队, 客队, 时间点) 分组计算 D～L，
-    以 template.xlsx 为模板生成 CAR{YYYYMMDD}.xlsx，写入 REPORT_DIR/{YYYYMMDD}/。
+    从 data_dir 下读取 master_{folder_name}.csv，按 (主队, 客队, 时间点) 分组计算 D～L，
+    以 template.xlsx 为模板生成 car_{YYYYMMDD}.xlsx，写入 REPORT_DIR/{YYYYMMDD}/。
     """
     folder_name = os.path.basename(data_dir.rstrip(os.sep))
     # 一览表在数据目录（crawl/merge 输出）
-    csv_path = os.path.join(data_dir, f"Master{folder_name}.csv")
+    csv_path = os.path.join(data_dir, f"master_{folder_name}.csv")
     if not os.path.isfile(csv_path):
         raise FileNotFoundError(f"一览表不存在，请先执行批处理1 merge_data.py: {csv_path}")
 
@@ -136,19 +136,19 @@ def run(data_dir: str, project_dir: str) -> None:
     if not results:
         raise ValueError("没有可分组的数据行")
 
-    # 以 template 为模板创建 CAR{YYYYMMDD}.xlsx，写入 REPORT_DIR/{YYYYMMDD}/
+    # 以 template 为模板创建 car_{YYYYMMDD}.xlsx，写入 REPORT_DIR/{YYYYMMDD}/
     report_dir = os.path.join(REPORT_DIR, folder_name)
     os.makedirs(report_dir, exist_ok=True)
     tmpl = pd.read_excel(template_path, header=None)
     col_names = [str(tmpl.iloc[0, i]) if i < tmpl.shape[1] else "" for i in range(NUM_COLUMNS)]
-    out_path = os.path.join(report_dir, f"CAR{folder_name}.xlsx")
+    out_path = os.path.join(report_dir, f"car_{folder_name}.xlsx")
     data_df = pd.DataFrame(results, columns=col_names)
     header_df = tmpl.iloc[:2, :NUM_COLUMNS].copy()
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         header_df.to_excel(writer, sheet_name="Sheet1", index=False, header=False)
         data_df.to_excel(writer, sheet_name="Sheet1", index=False, header=False, startrow=len(header_df))
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    rel_out_path = os.path.relpath(out_path, project_root)
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    rel_out_path = os.path.relpath(out_path, _display_root)
     logging.getLogger("calc_car").info("已按 2.2 节计算，共 %d 组 -> %s", len(results), rel_out_path)
 
 
@@ -164,7 +164,9 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, removed)
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
+        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 
     args = sys.argv[1:]
     if len(args) != 2 or not all(len(a) == 10 and a.isdigit() for a in args):

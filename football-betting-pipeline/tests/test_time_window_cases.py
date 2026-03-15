@@ -8,7 +8,7 @@ import main
 from merge_data import _collect_files_in_range
 from calc_car import _resolve_data_dir as resolve_car_data_dir
 from plot_car import _resolve_data_dir as resolve_plot_data_dir
-from scraper import ZhiyunScraper
+from scraper_real import ZhiyunScraper
 
 
 class DummyDriver:
@@ -21,7 +21,7 @@ def _scraper_date_folder_from_now(now_dt: datetime.datetime) -> str:
     """
     使用给定的 now_dt，模拟 scraper 当前时间，返回自然日目录 YYYYMMDD。
     """
-    import scraper as scraper_mod
+    import scraper_real as scraper_mod
 
     def fake_now():
         return now_dt
@@ -95,7 +95,7 @@ def test_case1_before_cutoff(tmp_path, monkeypatch):
     data_dir = resolve_car_data_dir(logical_date)
     assert data_dir.endswith(os.path.join("fake_download_case1", "20260310"))
 
-    # CAR 输出文件应为：REPORT_DIR/20260310/CAR20260310.xlsx（在其它测试中已验证）
+    # CAR 输出文件应为：REPORT_DIR/20260310/car_20260310.xlsx（在其它测试中已验证）
 
     # plot_car.py：曲线图的逻辑日期与目录解析一致
     monkeypatch.setattr("plot_car.DOWNLOAD_DIR", "/fake_download_case1")
