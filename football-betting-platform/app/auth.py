@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 from app.models import User, VerificationCode
 from app.sms import generate_code, send_sms
+from app.membership import grant_free_week
 from config import (
     JWT_SECRET_KEY,
     JWT_ALGORITHM,
@@ -24,17 +25,21 @@ auth_bp = Blueprint("auth", __name__)
 
 def _create_token(user_id: int) -> str:
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),  # JWT 规范建议 sub 为字符串
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
         "iat": datetime.utcnow(),
     }
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return token if isinstance(token, str) else token.decode("utf-8")
 
 
 def _verify_token(token: str):
     try:
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
+        sub = payload.get("sub")
+        return int(sub) if sub is not None and str(sub).isdigit() else sub
     except Exception:
         return None
 
@@ -129,25 +134,40 @@ def register():
     if email and User.query.filter_by(email=email).first():
         return jsonify({"ok": False, "message": "该邮箱已被使用"}), 409
 
-    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
-    user = User(
-        username=username,
-        gender=gender,
-        phone=phone,
-        email=email or None,
-        password_hash=password_hash,
-    )
-    db.session.add(user)
-    rec.used_at = now
-    db.session.commit()
+    try:
+        password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+        user = User(
+            username=username,
+            gender=gender,
+            phone=phone,
+            email=email or None,
+            password_hash=password_hash,
+        )
+        db.session.add(user)
+        rec.used_at = now
+        db.session.commit()
 
-    token = _create_token(user.id)
-    return jsonify({
-        "ok": True,
-        "message": "注册成功",
-        "user": user.to_dict(),
-        "token": token,
-    })
+        # 新用户赠送周会员（设计书：仅限一次，账号维度）
+        try:
+            grant_free_week(user.id)
+        except Exception as e:
+            if hasattr(request, "app") and request.app.logger:
+                request.app.logger.exception("注册时赠送周会员失败: %s", e)
+
+        token = _create_token(user.id)
+        return jsonify({
+            "ok": True,
+            "message": "注册成功",
+            "user": user.to_dict(),
+            "token": token,
+        })
+    except Exception as e:
+        if hasattr(request, "app") and request.app.logger:
+            request.app.logger.exception("注册失败: %s", e)
+        return jsonify({
+            "ok": False,
+            "message": "服务器错误，请稍后重试。若为首次部署，请执行 scripts/add_membership_tables.sql 并重启服务。",
+        }), 500
 
 
 @auth_bp.route("/login", methods=["POST"])

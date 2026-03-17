@@ -22,7 +22,9 @@ def test_match_team_empty_keyword_matches_all():
 
 
 def test_match_team_keyword_in_home_or_away():
-    assert _match_team("Me", "Home", "Away")
+    assert _match_team("Ho", "Home", "Away")
+    assert _match_team("ome", "Home", "Away")
     assert _match_team("Aw", "Home", "Away")
+    assert _match_team("ay", "Home", "Away")
     assert not _match_team("ZZZ", "Home", "Away")
 

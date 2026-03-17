@@ -85,17 +85,29 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username, gender: gender, password: password, phone: phone, code: code, email: email })
     })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.ok) {
+      .then(function(r) {
+        return r.text().then(function(text) {
+          var data = {};
+          try { data = JSON.parse(text); } catch (e) {}
+          if (!r.ok) console.error('注册接口异常', r.status, text);
+          return { ok: r.ok, data: data };
+        });
+      })
+      .then(function(result) {
+        var data = result.data;
+        if (result.ok && data && data.ok) {
           showMsg('注册成功，正在跳转到登录…', false);
           setTimeout(function() { window.location.href = '/login?registered=1'; }, 1500);
         } else {
-          showMsg(data.message || '注册失败', true);
+          showMsg((data && data.message) || '注册失败', true);
           btnSubmit.disabled = false;
         }
       })
-      .catch(function() { showMsg('网络错误，请重试', true); btnSubmit.disabled = false; });
+      .catch(function(e) {
+        console.error('注册请求失败', e);
+        showMsg('网络错误，请重试。请打开浏览器控制台(F12)查看详情。', true);
+        btnSubmit.disabled = false;
+      });
   };
 })();
 </script>

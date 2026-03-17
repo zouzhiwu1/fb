@@ -54,8 +54,11 @@ def get_sqlalchemy_engine_options():
     """若使用 PyMySQL 且密码可能含非 ASCII，用自定义 creator 避免 UnicodeEncodeError。"""
     return {"creator": _pymysql_creator}
 
-# JWT
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "change-me-in-production")
+# JWT（RFC 7518 建议 HS256 密钥至少 32 字节，否则会触发 InsecureKeyLengthWarning）
+JWT_SECRET_KEY = os.environ.get(
+    "JWT_SECRET_KEY",
+    "change-me-in-production-min-32-bytes-long",
+)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24 * 7  # 7 天
 
@@ -71,8 +74,18 @@ WORK_SPACE = os.environ.get(
     "WORK_SPACE",
     os.path.expanduser("~/Documents/cursor")
 ).rstrip(os.sep)
-# 曲线图目录：与 football-betting-pipeline 的 REPORT_DIR 一致（plot_car.py 生成的 *_曲线.png 在此目录下按 YYYYMMDD 存放）
-CURVE_IMAGE_DIR = os.environ.get(
-    "CURVE_IMAGE_DIR",
-    os.path.join(WORK_SPACE, "football-betting-report")
+# 曲线图目录：与 plot_car.py 输出一致，按 YYYYMMDD 子目录存放 主队_VS_客队.png
+# 优先用环境变量；否则尝试「项目根/football-betting-report」（platform 在项目内时）
+_def_report = os.path.join(WORK_SPACE, "football-betting-report")
+_config_dir = os.path.dirname(os.path.abspath(__file__))
+_repo_report = os.path.join(os.path.dirname(_config_dir), "football-betting-report")
+if os.path.isdir(_repo_report):
+    _def_report = _repo_report
+CURVE_IMAGE_DIR = os.environ.get("CURVE_IMAGE_DIR", _def_report)
+
+# 平台日志目录（与 pytest 覆盖率 htmlcov 同级，在 football-betting-log 下）
+LOG_DIR = os.environ.get(
+    "LOG_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "football-betting-log")
 )
+LOG_FILE = os.environ.get("LOG_FILE", os.path.join(LOG_DIR, "platform.log"))

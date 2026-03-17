@@ -1,17 +1,33 @@
 # -*- coding: utf-8 -*-
 """
 曲线图查询：按日期和球队名搜索并展示 pipeline 生成的曲线图。
-数据来源：CURVE_IMAGE_DIR 下各日期目录中的 {主队}_VS_{客队}_曲线.png
+数据来源：CURVE_IMAGE_DIR 下各日期目录中的 {主队}_VS_{客队}.png（与 plot_car.py 生成格式一致）
+权限：按《会员系统设计书》— 非会员仅可查看历史综合评估，当前综合评估需会员。
 """
 import os
 import re
 from urllib.parse import unquote
 
-from flask import Blueprint, send_from_directory, jsonify, request
+from flask import Blueprint, current_app, send_from_directory, jsonify, request
+
+from app.membership import is_member, _is_historical_assessment
 
 curves_bp = Blueprint("curves", __name__)
 
-CURVE_SUFFIX = "_曲线.png"
+# 与 auth 中一致：从 Header 解析 token 得到 user_id（未登录返回 None）
+def _get_user_id_from_request():
+    try:
+        from app.auth import _verify_token
+        auth = request.headers.get("Authorization") or ""
+        if not auth.startswith("Bearer "):
+            return None
+        token = auth[7:].strip()
+        return _verify_token(token)
+    except Exception:
+        return None
+
+# 与 plot_car.py 一致：文件名为 主队_VS_客队.png（无「_曲线」）
+CURVE_SUFFIX = ".png"
 VS_SEP = "_VS_"
 
 
@@ -21,7 +37,7 @@ def _get_curve_dir():
 
 
 def _parse_curve_filename(basename: str):
-    """从文件名解析出 (主队, 客队)，若不是曲线图返回 None。"""
+    """从文件名解析出 (主队, 客队)，若不是曲线图（*_VS_*.png）返回 None。"""
     if not basename.endswith(CURVE_SUFFIX):
         return None
     name = basename[: -len(CURVE_SUFFIX)]
@@ -55,14 +71,28 @@ def api_dates():
 
 @curves_bp.route("/search")
 def api_search():
-    """按日期和球队名搜索曲线图。参数: date=YYYYMMDD, team=可选关键词。"""
+    """按日期和球队名搜索曲线图。参数: date=YYYYMMDD, team=可选。需登录；非会员仅可查历史综合评估。"""
     date = (request.args.get("date") or "").strip()
     team = (request.args.get("team") or "").strip()
     if not date or not re.match(r"^\d{8}$", date):
         return jsonify({"error": "请提供有效日期 YYYYMMDD", "items": []})
+    user_id = _get_user_id_from_request()
+    if user_id is None:
+        return jsonify({"ok": False, "message": "请先登录", "items": []}), 401
+    is_historical = _is_historical_assessment(date)
+    if not is_historical and not is_member(user_id):
+        return jsonify({
+            "date": date,
+            "items": [],
+            "member_only": True,
+            "message": "只有会员才能查询当前综合评估数据",
+        })
     base = _get_curve_dir()
     dir_path = os.path.join(base, date)
+    logger = getattr(current_app, "logger", None)
     if not os.path.isdir(dir_path):
+        if logger:
+            logger.warning("曲线图目录不存在: %s（CURVE_IMAGE_DIR=%s）", dir_path, base)
         return jsonify({"date": date, "items": []})
     items = []
     for fn in os.listdir(dir_path):
@@ -80,15 +110,23 @@ def api_search():
             "away": away,
             "filename": fn,
         })
+    if not items and logger:
+        count_png = sum(1 for f in os.listdir(dir_path) if f.endswith(CURVE_SUFFIX))
+        logger.info("曲线图搜索无匹配: date=%s team=%s 目录=%s 该日共 %d 个 .png", date, team, dir_path, count_png)
     items.sort(key=lambda x: (x["home"], x["away"]))
     return jsonify({"date": date, "items": items})
 
 
 @curves_bp.route("/img/<date>/<path:filename>")
 def serve_image(date, filename):
-    """按日期和文件名提供曲线图图片。"""
+    """按日期和文件名提供曲线图图片。当前综合评估需会员，非会员返回 403。"""
     if not re.match(r"^\d{8}$", date):
         return "", 404
+    user_id = _get_user_id_from_request()
+    if user_id is None:
+        return jsonify({"ok": False, "message": "请先登录"}), 401
+    if not _is_historical_assessment(date) and not is_member(user_id):
+        return jsonify({"ok": False, "message": "只有会员才能查询当前综合评估数据"}), 403
     base = _get_curve_dir()
     dir_path = os.path.join(base, date)
     filename = unquote(filename)
