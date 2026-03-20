@@ -52,8 +52,8 @@ def _setup_logging():
     ch.setFormatter(fmt)
     logger.addHandler(ch)
 
-    # 相对路径以「工作目录上一级」为根，显示为 football-betting/football-betting-*
-    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    # 相对路径以 pipeline 父目录为根，日志中不含外层 football-betting/ 前缀
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     rel_log_path = os.path.relpath(log_path, _display_root)
     logger.info("主流程日志文件: %s", rel_log_path)
     return logger
@@ -86,7 +86,7 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel_removed = [os.path.relpath(p, _display_root) for p in removed]
         log.info(
             "已删除 %d 个超过 %d 天的日志文件: %s",

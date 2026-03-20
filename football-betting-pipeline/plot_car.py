@@ -60,7 +60,7 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     rel_log_path = os.path.relpath(log_path, _display_root)
     logger.info("日志文件: %s", rel_log_path)
     return logger
@@ -251,8 +251,8 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         # 提升 dpi 以在手机端放大时保持清晰
         plt.savefig(out_path, dpi=200, bbox_inches="tight")
         plt.close()
-        # 相对路径以「工作目录上一级」为根，显示为 football-betting/football-betting-*
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        # 相对路径以 pipeline 父目录为根，与全项目日志路径风格一致
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel_path = os.path.relpath(out_path, _display_root)
         log.info("已生成: %s", rel_path)
         count += 1
@@ -272,7 +272,7 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel_removed = [os.path.relpath(p, _display_root) for p in removed]
         log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
     _setup_chinese_font()

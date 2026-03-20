@@ -41,8 +41,8 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    # 相对路径以「football-betting」为起点，便于日志简短可读
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    # 相对路径以 pipeline 父目录为根，日志中不含外层 football-betting/ 前缀
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     rel_log_path = os.path.relpath(log_path, project_root)
     logger.info("日志文件: %s", rel_log_path)
     return logger
@@ -52,7 +52,7 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel_removed = [os.path.relpath(p, _display_root) for p in removed]
         log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 
@@ -81,7 +81,7 @@ def main():
             w.writerow(["home", "away", "score"])
             for _date, home, away, score in rows:
                 w.writerow([home, away, score])
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel = os.path.relpath(out_path, _display_root)
         log.info("已写入 %d 条完场记录 -> %s", len(rows), rel)
     except Exception as e:

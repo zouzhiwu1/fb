@@ -19,9 +19,9 @@ import sys
 
 from config import REPORT_DIR, WORK_SPACE
 
-# 日志中路径相对于此根，显示为 football-betting/football-betting-*
+# 日志中路径相对于 pipeline 父目录为根，显示为 football-betting-data/、football-betting-report/ 等（无外层 football-betting/ 前缀）
 def _display_root():
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
 try:
     from PIL import Image, ImageDraw, ImageFont

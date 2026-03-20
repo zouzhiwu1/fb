@@ -35,7 +35,7 @@ def _setup_logging():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
     logger.addHandler(ch)
-    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+    _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     rel_log_path = os.path.relpath(log_path, _display_root)
     logger.info("日志文件: %s", rel_log_path)
     return logger
@@ -105,7 +105,7 @@ def main():
     log = _setup_logging()
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         rel_removed = [os.path.relpath(p, _display_root) for p in removed]
         log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 

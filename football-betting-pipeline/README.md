@@ -194,12 +194,16 @@ python plot_car.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
 | `CRAWLER_REPORT_DIR` | 报告目录：calc_car 的 car_{YYYYMMDD}.xlsx、plot_car 的 {主队}_VS_{客队}.png 写入此目录下对应的 YYYYMMDD 子目录 | 默认 `WORK_SPACE/football-betting-report` |
 | `CRAWLER_CUTOFF_HOUR` | 跨天临界点（0～23 时）。该时及之后 → 当日文件夹；该时之前 → 前一日文件夹；`run_real.py` 也据此划分 24 小时逻辑区间 | `12` |
 | `CRAWLER_TIMEZONE` | 用于“当前时间”的时区（决定下载目录/文件名） | `Asia/Tokyo` |
-| `CRAWLER_HEADLESS` | `1` 无头模式，`0` 有浏览器界面 | `1` |
+| `CRAWLER_HEADLESS` | `1` 无头模式（不弹窗），`0` 有浏览器界面 | `1` |
 | `CRAWLER_DEBUG_LOG_DIR` | 日志目录：crawl/merge_data 等日志、调试用 `debug_export_page_*.html` 的存放路径 | 默认 `WORK_SPACE/football-betting-log` |
 | `CRAWLER_LOG_RETENTION_DAYS` | 日志保留天数，超过此天数的日志文件会在运行前被删除 | `7` |
 | `CRAWLER_TRIGGER_HOURS` | 定时任务触发整点（逗号分隔，0～23），仅影响 `run_real.py` 无参数时的区间计算 | `2,4,6,13,15,17,19,21,23` |
 | `CRAWLER_DEBUG_MAX_MATCHES` | **调试用**：最多抓取场数，`0` 表示不限制；设为正整数（如 `3`）则只抓前 N 场即结束，便于快速跑通流程 | `0` |
 | `CRAWLER_DEBUG_MATCH_KEYWORDS` | **调试用**：仅抓取主队或客队名称包含任一关键词的比赛，逗号分隔。例如 `帕纳辛纳科斯,里尔,博洛尼亚`。不设或为空则抓取全部 | 未设置 |
+| `CRAWLER_MATCH_FILTER_VISIBLE_ONLY` | `run_real` 列表**可视过滤**：`1` 只处理页面上可见行（与「隐藏 N 场」一致）；`0` 则包含 DOM 内隐藏行 | `1` |
+| `CRAWLER_MATCH_STATUS_MODES` | `run_real` 列表**状态过滤**，逗号分隔、并集：`not_started`（未开场，空白或 `-`）、`live`（进行中）、`finished`（状态列含「完」） | `not_started` |
+
+联赛白名单仍由 `config.py` 中 `TARGET_LEAGUE_NAMES` / 环境变量 `CRAWLER_TARGET_LEAGUES` 控制（见该文件注释）。
 
 ### 环境变量的使用方式
 
