@@ -23,6 +23,7 @@
 ```
 football-betting/
 ├── README.md                    # 本文件
+├── requirements.txt             # 顶层统一 Python 依赖（platform + pipeline 合并，可选使用）
 ├── football-betting-pipeline/   # 模块 1：爬虫 + 合并 + 计算 + 曲线图
 │   ├── run_real.py              # 即时流程入口（crawl_real → merge_data → calc_car → plot_car）
 │   ├── run_final.py             # 完场流程入口（crawl_final → add_score_to_image）
@@ -62,6 +63,21 @@ football-betting/
 ---
 
 ## 安装与运行
+
+### 顶层统一依赖（可选）
+
+若希望在一个虚拟环境中同时安装 **pipeline** 与 **platform** 的 Python 依赖，可在项目根目录使用顶层 `requirements.txt`：
+
+```bash
+cd football-betting
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+该文件由 `football-betting-platform/requirements.txt` 与 `football-betting-pipeline/requirements.txt` 合并去重得到。若只运行单一模块，也可直接进入对应子目录执行 `pip install -r requirements.txt`。
+
+---
 
 ### 模块 1：数据抓取与曲线图（pipeline）
 
