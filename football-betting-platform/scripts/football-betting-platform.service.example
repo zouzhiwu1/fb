@@ -1,0 +1,18 @@
+# 由 scripts/install-systemd.sh 自动替换 @INSTALL_ROOT@ 并安装到 /etc/systemd/system/
+# 手动：sed "s|@INSTALL_ROOT@|/你的绝对路径|g" 本文件 | sudo tee /etc/systemd/system/football-betting-platform.service
+
+[Unit]
+Description=football-betting-platform (Flask)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=@INSTALL_ROOT@
+EnvironmentFile=-@INSTALL_ROOT@/.env
+ExecStart=@INSTALL_ROOT@/.venv/bin/python @INSTALL_ROOT@/run.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
