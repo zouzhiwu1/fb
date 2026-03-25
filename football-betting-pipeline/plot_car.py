@@ -20,6 +20,7 @@
 """
 import datetime
 import logging
+import math
 import os
 import re
 import sys
@@ -71,6 +72,29 @@ def _safe_filename(name: str) -> str:
     """去掉或替换文件名非法字符。"""
     s = re.sub(r'[<>:"/\\|?*]', "_", name)
     return s.strip() or "match"
+
+
+def _annotate_line_points(ax, x_vals, y_vals, color: str, decimal_places: int = 3) -> None:
+    """在每个数据点旁标注 y 数值（与曲线同色，略上移避免压住标记）。"""
+    for x, y in zip(x_vals, y_vals):
+        if pd.isna(y):
+            continue
+        try:
+            yf = float(y)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(yf):
+            continue
+        ax.annotate(
+            f"{yf:.{decimal_places}f}",
+            (x, yf),
+            textcoords="offset points",
+            xytext=(0, 6),
+            ha="center",
+            fontsize=7,
+            color=color,
+            clip_on=True,
+        )
 
 
 def _setup_chinese_font():
@@ -236,6 +260,9 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         ax1.plot(x_pos, y_main, "o-", label="主", color="C0", linewidth=2, markersize=5)
         ax1.plot(x_pos, y_draw, "s-", label="平", color="C1", linewidth=2, markersize=5)
         ax1.plot(x_pos, y_away, "^-", label="客", color="C2", linewidth=2, markersize=5)
+        _annotate_line_points(ax1, x_pos, y_main, "C0")
+        _annotate_line_points(ax1, x_pos, y_draw, "C1")
+        _annotate_line_points(ax1, x_pos, y_away, "C2")
         ax1.set_xticks(x_pos)
         ax1.set_xticklabels(x_labels, rotation=45, ha="right")
         ax1.set_ylabel("评估值", fontsize=11)
@@ -279,6 +306,12 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         ax2.set_title("凯利指数曲线图", fontsize=12)
         ax2.legend(loc="best")
         ax2.grid(True, alpha=0.3)
+        k_main = grp[data.columns[COL_KELLY_MAIN]].tolist()
+        k_draw = grp[data.columns[COL_KELLY_DRAW]].tolist()
+        k_away = grp[data.columns[COL_KELLY_AWAY]].tolist()
+        _annotate_line_points(ax2, x_kelly, k_main, "C0")
+        _annotate_line_points(ax2, x_kelly, k_draw, "C1")
+        _annotate_line_points(ax2, x_kelly, k_away, "C2")
 
         plt.tight_layout(rect=[0, 0, 1, 0.86])
         os.makedirs(report_dir, exist_ok=True)
