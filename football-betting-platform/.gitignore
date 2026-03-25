@@ -1,6 +1,7 @@
 .venv/
 venv/
 .env
+.platform.pid
 *.pyc
 __pycache__/
 .Python

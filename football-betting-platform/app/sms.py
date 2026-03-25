@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-短信发送：默认 mock（控制台输出验证码）。
+短信发送：默认 mock（通过 logging 写入 platform_*.log，与 run_mac.sh 后台运行一致）。
 生产环境可替换为阿里云/腾讯云等，见 README。
 """
+import logging
 import random
 import string
 
@@ -17,7 +18,9 @@ def generate_code(length=None):
 def send_verification_code(phone: str, code: str) -> bool:
     """发送验证码。返回是否发送成功。"""
     if SMS_PROVIDER == "mock" or not SMS_PROVIDER:
-        print(f"[SMS Mock] 手机号: {phone}, 验证码: {code}")
+        # 必须用 root logger：Flask 对名为「app」的包 logger 常设 propagate=False，
+        # app.sms 的日志到不了挂在 root 上的 DailyPlatformFileHandler。
+        logging.getLogger().info("[SMS Mock] 手机号: %s, 验证码: %s", phone, code)
         return True
     # 可在此接入阿里云/腾讯云等，例如：
     # return send_aliyun_sms(phone, code)

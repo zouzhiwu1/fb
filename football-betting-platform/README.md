@@ -7,7 +7,7 @@
 - Python 3.10+
 - Flask + Flask-SQLAlchemy + PyMySQL
 - JWT 登录态
-- 短信验证码：默认 mock（控制台打印），可接阿里云/腾讯云等
+- 短信验证码：默认 mock（写入 `football-betting-log/platform_YYYYMMDD.log`），可接阿里云/腾讯云等
 
 ## 本地运行
 
@@ -25,47 +25,35 @@ CREATE DATABASE football_betting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_c
   `mysql+pymysql://YOUR_MYSQL_USER:YOUR_MYSQL_PASSWORD@localhost:3306/football_betting`
 - `JWT_SECRET_KEY`：任意随机长字符串，用于签发登录 token
 
-不填短信相关则使用 mock，验证码会在控制台打印。
+不填短信相关则使用 mock，验证码会记入 **`football-betting-log/platform_YYYYMMDD.log`**（`[SMS Mock]` 行）。
 
-### 3. 安装依赖并启动
+### 3. 安装依赖
 
 ```bash
 cd football-betting-platform
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python run.py
 ```
 
-服务默认在 `http://127.0.0.1:5001`（端口可在 `.env` 中设置 `PORT`）。
+服务默认端口 `5001`（可在 `.env` 中设置 `PORT`）。
 
-### 云服务器：后台运行 + 固定日志（推荐）
+### 4. 启动（统一入口，后台 + 日志）
 
-**macOS / Windows 本地开发不要执行 `scripts/server`**（没有 systemd）。本地在项目目录用 **`./scripts/run.sh`** 或 **`.venv/bin/python run.py`** 即可。
+业务日志始终在 **`football-betting-log/platform_YYYYMMDD.log`**（与 `football-betting-platform` 同级的 `football-betting-log` 目录，例如 `/root/projects/football-betting/football-betting-log/platform_20260325.log`）。
 
-用 **systemd** 托管进程：**关终端、断 SSH 仍运行**。业务日志由应用写入 **`football-betting-log/platform_YYYYMMDD.log`**（与 pipeline 同级目录，即 `football-betting-platform` 的上一级下的 `football-betting-log/`）；Werkzeug/未接入 app.logger 的输出可在 `journalctl` 查看。**不要**每次报错都重装单元——装好后日常只用 **restart**。
+| 环境 | 命令（在 `football-betting-platform` 目录下） |
+|------|-----------------------------------------------|
+| **macOS** | `chmod +x run_mac.sh && ./run_mac.sh` |
+| **Linux（云服务器等）** | `chmod +x run_linux.sh && ./run_linux.sh` |
 
-**首次（或以后改了 `scripts/football-betting-platform.service.example`、换了部署路径）：**
+- **macOS**：`nohup` 后台运行；同目录会写 `.platform.pid`，再次执行会先停旧进程再起。
+- **Linux**：首次运行会提示 **sudo**，自动安装 systemd 并启动；之后再执行同一脚本只做 **`systemctl restart`**。若无 systemd，会退化为与 Mac 相同的 `nohup`。
+- **排查**：`tail -f ../football-betting-log/platform_$(date +%Y%m%d).log`；Linux 还可 `sudo systemctl status football-betting-platform`、`sudo journalctl -u football-betting-platform -f`。
+- **仅调试、要前台看控制台**：`./scripts/run.sh`（关终端即停）。
+- 若修改了 `scripts/football-betting-platform.service.example` 或更换了部署路径，可先删掉 `/etc/systemd/system/football-betting-platform.service` 后再执行 **`./run_linux.sh`**，或直接 **`sudo ./scripts/install-systemd.sh`**。
 
-```bash
-cd football-betting-platform
-chmod +x scripts/server scripts/run.sh scripts/install-systemd.sh
-sudo ./scripts/server install
-```
-
-**日常：**
-
-| 动作 | 命令 |
-|------|------|
-| 重启（改代码、`pip install` 后） | `sudo ./scripts/server restart` |
-| 启动 / 停止 | `sudo ./scripts/server start` / `stop` |
-| 状态 | `./scripts/server status` |
-| **看运行日志** | `./scripts/server logs`（即当天 `tail -f ../football-betting-log/platform_YYYYMMDD.log`） |
-| systemd 汇总日志 | `./scripts/server journal` |
-
-本地/临时排错仍可用前台：`./scripts/run.sh`（关终端即停）。`run.sh` 固定使用 `.venv/bin/python`，避免未 `activate` 时出现 `No module named flask`。
-
-### 4. 网页
+### 5. 网页
 
 - **登录**：http://127.0.0.1:5001/login  
 - **注册**：http://127.0.0.1:5001/register（新用户可点「去注册」进入）  
@@ -77,7 +65,7 @@ sudo ./scripts/server install
 - **曲线图查询**：http://127.0.0.1:5001/curves（按日期、球队名搜索并展示 football-betting-pipeline 生成的曲线图；需在 `.env` 中配置 `CURVE_IMAGE_DIR` 与 pipeline 的输出目录一致）  
   非会员能否查看某场，由 MySQL 表 `evaluation_matches` 判定（见《会员系统设计书》§3.3）；该表由 pipeline 在出图/完场流程中维护（§3.4），pipeline 需配置与平台相同的 `DATABASE_URL`。
 
-注册需填写：用户名、性别、密码、手机号、邮箱；手机号需先「获取验证码」（验证码会打印在运行 `python run.py` 的终端里）。
+注册需填写：用户名、性别、密码、手机号、邮箱；手机号需先「获取验证码」（mock 下请在同目录日志文件查看 `[SMS Mock]`）。
 
 若之前已创建过 `users` 表且没有 `username`/`gender`/`email` 列，请在 MySQL 中执行：
 
@@ -208,7 +196,7 @@ sequenceDiagram
 
 以下默认服务 **`http://127.0.0.1:5001`**（`python run.py`）；请将示例中的手机号、验证码、`TOKEN` 换成你本机真实值。
 
-**0）发验证码（mock 下验证码在运行 `run.py` 的终端里打印）**
+**0）发验证码（mock 下验证码在 `football-betting-log/platform_YYYYMMDD.log` 的 `[SMS Mock]` 行）**
 
 ```bash
 curl -s -X POST http://127.0.0.1:5001/api/auth/send-code \
@@ -457,7 +445,7 @@ python3 -m pytest tests/test_pay.py tests/test_alipay_notify.py tests/test_wecha
 
 ## 短信接入（生产环境）
 
-当前默认 `SMS_PROVIDER=mock`，验证码只在控制台输出。生产可：
+当前默认 `SMS_PROVIDER=mock`，验证码写入日志文件（`[SMS Mock]`）。生产可：
 
 1. 在 `.env` 中设置 `SMS_PROVIDER=aliyun`（或你实现的厂商名）。
 2. 在 `app/sms.py` 的 `send_verification_code` 中根据 `SMS_PROVIDER` 调用对应厂商 API（阿里云、腾讯云等），并配置 `SMS_ACCESS_KEY_ID`、`SMS_ACCESS_KEY_SECRET`、签名、模板等（变量名见 `.env.example`）。

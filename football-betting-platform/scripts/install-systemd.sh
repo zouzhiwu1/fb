@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 安装/更新 systemd 单元（可反复执行）。日常改代码或 pip 后: sudo ./scripts/server restart
+# 安装/更新 systemd 单元（由 run_linux.sh 在首次部署时自动调用；也可手动 sudo 执行）。
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -13,7 +13,7 @@ APP_LOG="${APP_LOG_DIR}/platform_${DAY}.log"
 
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "未找到 systemctl：本脚本只用于带 systemd 的 Linux（如云服务器），macOS 请勿执行。" >&2
-  echo "在 Mac 上开发请: cd \"$(cd "${SCRIPT_DIR}/.." && pwd)\" && ./scripts/run.sh" >&2
+  echo "在 Mac 上请使用项目根目录: ./run_mac.sh（或前台 ./scripts/run.sh）" >&2
   exit 1
 fi
 if [[ ! -f "$TEMPLATE" ]]; then
@@ -46,8 +46,8 @@ systemctl restart "$SERVICE_NAME"
 echo ""
 echo "=== football-betting-platform 已安装并重启 ==="
 echo "业务日志:  $APP_LOG_DIR/platform_YYYYMMDD.log  （当天示例: $APP_LOG）"
-echo "看今天日志: ${ROOT}/scripts/server logs"
-echo "重启服务: sudo ${ROOT}/scripts/server restart"
-echo "仅当改了单元模板或项目路径变了再: sudo ${ROOT}/scripts/server install"
-echo "状态:      ${ROOT}/scripts/server status"
+echo "看今天日志: tail -f ${APP_LOG}"
+echo "日常重启请: ${ROOT}/run_linux.sh"
+echo "仅当改了单元模板或项目路径变了再: sudo ${ROOT}/scripts/install-systemd.sh"
+echo "状态（可选）: systemctl status ${SERVICE_NAME}"
 echo ""

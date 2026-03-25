@@ -7,10 +7,13 @@ def test_generate_code_default_length_and_digits():
     assert code.isdigit()
 
 
-def test_send_sms_mock_provider_returns_true(capsys):
+def test_send_sms_mock_provider_returns_true(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
     ok = send_sms("13800138000", "123456")
     assert ok is True
-    out, _ = capsys.readouterr()
-    assert "13800138000" in out
-    assert "123456" in out
+    joined = " ".join(r.message for r in caplog.records)
+    assert "13800138000" in joined
+    assert "123456" in joined
 
