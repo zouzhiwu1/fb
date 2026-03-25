@@ -1,0 +1,14 @@
+<view class="intro muted">选择会员档位创建订单（与网页端 recharge 一致）</view>
+
+<view wx:if="{{loading}}" class="center muted">加载中…</view>
+
+<view wx:else>
+  <view wx:for="{{options}}" wx:key="membership_type" class="row card" bindtap="buy" data-type="{{item.membership_type}}">
+    <view>
+      <text class="title">{{item.label}}</text>
+      <view class="price">¥ {{item.price}}</view>
+    </view>
+    <text wx:if="{{buying === item.membership_type}}" class="muted">…</text>
+    <text wx:else class="go">购买</text>
+  </view>
+</view>

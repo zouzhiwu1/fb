@@ -1,0 +1,56 @@
+/** 与 football-betting-mobile 深色主题一致 */
+page {
+  background-color: #050816;
+  color: #f9fafb;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background-color: #020617;
+  border-radius: 24rpx;
+  border: 1px solid #1f2937;
+}
+
+.input {
+  background-color: #050816;
+  border: 1px solid #1f2937;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  color: #f9fafb;
+  font-size: 30rpx;
+}
+
+.btn-primary {
+  margin-top: 40rpx;
+  background-color: #22c55e;
+  color: #022c22;
+  font-weight: 600;
+  border-radius: 999rpx;
+  padding: 28rpx;
+  text-align: center;
+  font-size: 32rpx;
+}
+
+.btn-primary.disabled {
+  opacity: 0.65;
+}
+
+.link {
+  color: #60a5fa;
+  font-size: 30rpx;
+  margin-top: 32rpx;
+  text-align: center;
+}
+
+.label {
+  font-size: 26rpx;
+  color: #9ca3af;
+  margin-bottom: 12rpx;
+  margin-top: 20rpx;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 26rpx;
+}

@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="title">足球数据平台</view>
+  <view class="sub">使用手机号与密码登录（与网页端同一账号）</view>
+
+  <view class="label">手机号</view>
+  <input class="input" type="number" maxlength="11" placeholder="11 位手机号" placeholder-class="ph" value="{{phone}}" bindinput="onPhone" />
+
+  <view class="label">密码</view>
+  <input class="input" password placeholder="密码" placeholder-class="ph" value="{{password}}" bindinput="onPwd" />
+
+  <view class="btn-primary {{loading ? 'disabled' : ''}}" bindtap="onLogin">
+    {{loading ? '登录中…' : '登录'}}
+  </view>
+
+  <navigator url="/pages/register/register" open-type="navigate" class="link">没有账号？去注册</navigator>
+</view>

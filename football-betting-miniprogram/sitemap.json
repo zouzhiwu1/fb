@@ -1,0 +1,9 @@
+{
+  "desc": "默认允许爬虫索引（可按需改为 disallow）",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

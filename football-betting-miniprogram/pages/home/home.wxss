@@ -1,0 +1,48 @@
+.page {
+  padding: 32rpx 40rpx 80rpx;
+  min-height: 100vh;
+}
+
+.welcome {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #f9fafb;
+  margin-bottom: 12rpx;
+}
+
+.hint {
+  font-size: 26rpx;
+  color: #9ca3af;
+  margin-bottom: 40rpx;
+}
+
+.menu {
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx;
+  border-bottom: 1px solid #1f2937;
+  font-size: 32rpx;
+  color: #f9fafb;
+}
+
+.item.last {
+  border-bottom: none;
+}
+
+.chev {
+  color: #9ca3af;
+  font-size: 44rpx;
+}
+
+.logout {
+  margin-top: 56rpx;
+  text-align: center;
+  color: #f87171;
+  font-size: 32rpx;
+  padding: 28rpx;
+}

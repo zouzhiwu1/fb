@@ -1,0 +1,34 @@
+<scroll-view scroll-y class="scroll" enhanced show-scrollbar="{{false}}">
+  <view class="label">用户名</view>
+  <input class="input" placeholder="用户名" placeholder-class="ph" value="{{username}}" bindinput="onUsername" />
+
+  <view class="label">性别</view>
+  <view class="row">
+    <view class="chip {{gender === '男' ? 'on' : ''}}" data-g="男" bindtap="onGender">男</view>
+    <view class="chip {{gender === '女' ? 'on' : ''}}" data-g="女" bindtap="onGender">女</view>
+    <view class="chip {{gender === '其他' ? 'on' : ''}}" data-g="其他" bindtap="onGender">其他</view>
+  </view>
+
+  <view class="label">密码（≥6 位）</view>
+  <input class="input" password placeholder-class="ph" value="{{password}}" bindinput="onPassword" />
+
+  <view class="label">手机号</view>
+  <view class="phone-row">
+    <input class="input flex1" type="number" maxlength="11" placeholder-class="ph" value="{{phone}}" bindinput="onPhone" />
+    <view class="code-btn {{sending || cooldown > 0 ? 'disabled' : ''}}" bindtap="onSendCode">
+      {{cooldown > 0 ? cooldown + 's' : sending ? '…' : '验证码'}}
+    </view>
+  </view>
+
+  <view class="label">短信验证码</view>
+  <input class="input" type="number" maxlength="8" placeholder-class="ph" value="{{code}}" bindinput="onCode" />
+
+  <view class="label">邮箱</view>
+  <input class="input" placeholder-class="ph" value="{{email}}" bindinput="onEmail" />
+
+  <view class="btn-primary {{loading ? 'disabled' : ''}}" bindtap="onSubmit">
+    {{loading ? '提交中…' : '注册'}}
+  </view>
+
+  <navigator url="/pages/login/login" open-type="navigate" class="link">已有账号？去登录</navigator>
+</scroll-view>

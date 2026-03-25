@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/register/register",
+    "pages/home/home",
+    "pages/curves/curves",
+    "pages/account/account",
+    "pages/membership/membership",
+    "pages/recharge/recharge",
+    "pages/records/records"
+  ],
+  "window": {
+    "navigationBarTitleText": "足球评估平台",
+    "navigationBarBackgroundColor": "#050816",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#050816",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

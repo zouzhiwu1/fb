@@ -1,0 +1,13 @@
+<view wx:if="{{loading}}" class="center muted">加载中…</view>
+
+<scroll-view wx:else scroll-y class="scroll" enhanced show-scrollbar="{{false}}">
+  <view wx:if="{{!orders.length}}" class="empty">{{emptyHint}}</view>
+  <view wx:for="{{orders}}" wx:key="id" class="card item">
+    <text class="subject">{{item.subject}}</text>
+    <text class="meta">状态：{{item.status_label}}</text>
+    <text class="meta">金额：¥ {{item.total_amount}}</text>
+    <text class="meta">单号：{{item.out_trade_no}}</text>
+    <text class="meta">创建：{{item.created_at || '—'}}</text>
+    <text wx:if="{{item.paid_at}}" class="meta">支付：{{item.paid_at}}</text>
+  </view>
+</scroll-view>

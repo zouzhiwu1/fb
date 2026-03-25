@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="welcome">你好，{{displayName}}</view>
+  <view class="hint">功能与网页端 home 一致</view>
+
+  <view class="card menu">
+    <view class="item" bindtap="go" data-url="/pages/curves/curves">
+      <text>曲线图查询</text>
+      <text class="chev">›</text>
+    </view>
+    <view class="item" bindtap="go" data-url="/pages/account/account">
+      <text>账户资料</text>
+      <text class="chev">›</text>
+    </view>
+    <view class="item" bindtap="go" data-url="/pages/membership/membership">
+      <text>会员状态</text>
+      <text class="chev">›</text>
+    </view>
+    <view class="item" bindtap="go" data-url="/pages/recharge/recharge">
+      <text>充值 / 开通会员</text>
+      <text class="chev">›</text>
+    </view>
+    <view class="item last" bindtap="go" data-url="/pages/records/records">
+      <text>充值记录</text>
+      <text class="chev">›</text>
+    </view>
+  </view>
+
+  <view class="logout" bindtap="onLogout">退出登录</view>
+</view>

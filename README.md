@@ -10,7 +10,7 @@
 |------|------|
 | **1. 数据抓取与数据分析** | 爬虫抓取、数据处理、生成曲线图图片 |
 | **2. 用户管理系统** | 注册、登录、支付、**查询**（按日期/球队查曲线图等） |
-| **3. 手机客户端** | React（Expo）实现，对接用户管理系统 |
+| **3. 手机客户端** | React（Expo）与微信小程序，对接用户管理系统 |
 
 - **模块 1** 输出：按日期目录存放的曲线图，供模块 2 读取。
 - **模块 2**（用户管理系统）提供「曲线图查询」页面与 API，按日期、球队名搜索并展示曲线图。
@@ -42,6 +42,10 @@ football-betting/
 │   └── README.md
 ├── football-betting-mobile/     # 模块 3：移动端（Expo / React Native）
 │   ├── package.json
+│   └── README.md
+├── football-betting-miniprogram/ # 微信小程序（与 mobile 同 API）
+│   ├── app.json
+│   ├── utils/config.js          # 填写 API_BASE
 │   └── README.md
 ├── football-betting-doc/        # 设计/架构文档
 ├── football-betting-data/       # 数据目录（爬虫 .xls、Master*.csv，按需创建或由 WORK_SPACE 指定）
@@ -140,7 +144,9 @@ pip install -r requirements.txt
 
 ---
 
-### 模块 3：移动端（mobile）
+### 模块 3：客户端（mobile / 微信小程序）
+
+**Expo 移动端**
 
 ```bash
 cd football-betting-mobile
@@ -149,6 +155,10 @@ npx expo start
 ```
 
 按提示用 Expo Go 或模拟器打开。对接后端时需在 App 内配置 platform 的 API 地址。详见 [football-betting-mobile/README.md](football-betting-mobile/README.md)。
+
+**微信小程序**（与 mobile 共用同一套 platform API）
+
+用微信开发者工具打开目录 `football-betting-miniprogram`，在 `utils/config.js` 中填写 HTTPS `API_BASE`，并在小程序后台配置 request / downloadFile 合法域名。详见 [football-betting-miniprogram/README.md](football-betting-miniprogram/README.md)。
 
 ---
 

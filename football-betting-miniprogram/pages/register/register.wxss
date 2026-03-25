@@ -1,0 +1,54 @@
+.scroll {
+  height: 100vh;
+  padding: 32rpx 48rpx 80rpx;
+  box-sizing: border-box;
+}
+
+.ph {
+  color: #6b7280;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.chip {
+  padding: 20rpx 32rpx;
+  border-radius: 999rpx;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #9ca3af;
+  font-size: 28rpx;
+}
+
+.chip.on {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #022c22;
+  font-weight: 600;
+}
+
+.phone-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.flex1 {
+  flex: 1;
+}
+
+.code-btn {
+  background: #60a5fa;
+  color: #fff;
+  font-weight: 600;
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+}
+
+.code-btn.disabled {
+  opacity: 0.55;
+}

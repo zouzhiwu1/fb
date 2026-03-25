@@ -1,0 +1,26 @@
+<scroll-view scroll-y class="scroll" enhanced show-scrollbar="{{false}}">
+  <view class="form card">
+    <view class="label">日期 YYYYMMDD</view>
+    <input class="input" type="number" maxlength="8" value="{{date}}" bindinput="onDate" />
+
+    <scroll-view wx:if="{{dates.length}}" scroll-x class="chips" show-scrollbar="{{false}}">
+      <view class="chip-row">
+        <view wx:for="{{dates}}" wx:key="*this" class="chip" data-dt="{{item}}" bindtap="pickDate">{{item}}</view>
+      </view>
+    </scroll-view>
+
+    <view class="label">球队名（主或客，模糊匹配）</view>
+    <input class="input" value="{{team}}" bindinput="onTeam" />
+
+    <view class="btn-primary {{searching ? 'disabled' : ''}}" bindtap="onSearch">
+      {{searching ? '搜索中…' : '搜索'}}
+    </view>
+  </view>
+
+  <view wx:for="{{items}}" wx:key="k" class="card img-card">
+    <view class="card-title">{{item.home}} VS {{item.away}}</view>
+    <image wx:if="{{item.localPath}}" class="img" src="{{item.localPath}}" mode="widthFix" />
+    <view wx:elif="{{item.loadError}}" class="img-err">图片加载失败（请检查登录与域名）</view>
+    <view wx:else class="img-err">加载中…</view>
+  </view>
+</scroll-view>

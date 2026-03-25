@@ -1,0 +1,35 @@
+<scroll-view scroll-y class="scroll" enhanced show-scrollbar="{{false}}">
+  <view class="section card">
+    <view class="section-title">当前资料</view>
+    <view class="row">用户名：{{user.username || '—'}}</view>
+    <view class="row">手机：{{user.phone || '—'}}</view>
+    <view class="row">邮箱：{{user.email || '—'}}</view>
+    <view class="row">性别：{{user.gender || '—'}}</view>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">修改密码</view>
+    <view wx:if="{{user.password_set}}" class="note">已设置过密码需填写当前密码</view>
+    <view wx:else class="note">当前账号未设置过密码，可直接设新密码</view>
+    <input wx:if="{{user.password_set}}" class="input" password placeholder="当前密码" placeholder-class="ph" value="{{curPwd}}" bindinput="onCurPwd" />
+    <input class="input" password placeholder="新密码（≥6 位）" placeholder-class="ph" value="{{newPwd}}" bindinput="onNewPwd" />
+    <view class="btn-primary {{busy ? 'disabled' : ''}}" bindtap="doChangePassword">保存密码</view>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">修改邮箱</view>
+    <input class="input" placeholder="新邮箱" placeholder-class="ph" value="{{email}}" bindinput="onEmail" />
+    <view class="btn-primary" bindtap="doChangeEmail">保存邮箱</view>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">修改手机号</view>
+    <view class="note">向新手机号发验证码后提交</view>
+    <input class="input" type="number" maxlength="11" placeholder="新手机号" placeholder-class="ph" value="{{newPhone}}" bindinput="onNewPhone" />
+    <view class="secondary {{cooldown > 0 ? 'disabled' : ''}}" bindtap="sendForNewPhone">
+      {{cooldown > 0 ? cooldown + 's 后可重发' : '发送验证码到新手机'}}
+    </view>
+    <input class="input" type="number" placeholder="验证码" placeholder-class="ph" value="{{phoneCode}}" bindinput="onPhoneCode" />
+    <view class="btn-primary" bindtap="doChangePhone">确认换绑手机</view>
+  </view>
+</scroll-view>

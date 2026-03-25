@@ -1,0 +1,35 @@
+.intro {
+  margin: 32rpx;
+  font-size: 28rpx;
+}
+
+.center {
+  text-align: center;
+  padding: 48rpx;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 32rpx 24rpx;
+  padding: 32rpx;
+}
+
+.title {
+  color: #f9fafb;
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.price {
+  color: #22c55e;
+  margin-top: 8rpx;
+  font-size: 30rpx;
+}
+
+.go {
+  color: #60a5fa;
+  font-weight: 600;
+  font-size: 32rpx;
+}
