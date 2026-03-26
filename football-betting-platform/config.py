@@ -93,7 +93,7 @@ CURVE_IMAGE_DIR = os.environ.get("CURVE_IMAGE_DIR", _def_report)
 
 # 曲线图：默认 1 = 仅当前有效会员可查看任何曲线（会员过期后一律不可看，避免与 evaluation_matches 判场不一致时仍能看图）。
 # 若需严格按设计书「非会员可看完场/历史」：在 .env 设置 CURVES_REQUIRE_ACTIVE_MEMBERSHIP=0
-_CURVES_REQ = os.environ.get("CURVES_REQUIRE_ACTIVE_MEMBERSHIP", "1").strip().lower()
+_CURVES_REQ = os.environ.get("CURVES_REQUIRE_ACTIVE_MEMBERSHIP", "0").strip().lower()
 CURVES_REQUIRE_ACTIVE_MEMBERSHIP = _CURVES_REQ not in ("0", "false", "no", "off")
 
 # 平台日志目录（与 pipeline 一致：仓库根下 football-betting-log）

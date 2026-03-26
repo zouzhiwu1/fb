@@ -12,7 +12,10 @@
       margin: 0 auto;
       padding: 1rem;
       background: #f5f5f5;
+      height: 100vh;
+      overflow: hidden;
     }
+    .page { height: calc(100vh - 2rem); display: flex; flex-direction: column; min-height: 0; }
     h1 { font-size: 1.5rem; color: #333; margin-bottom: 1rem; }
     .search-bar {
       display: flex;
@@ -48,7 +51,8 @@
     .message.info { background: #e0f2fe; color: #0369a1; }
     .message.error { background: #fee2e2; color: #b91c1c; }
     .message.empty { background: #f1f5f9; color: #64748b; }
-    .results { display: grid; gap: 1rem; }
+    .results-wrap { flex: 1; min-height: 0; overflow-y: auto; }
+    .results { display: grid; gap: 1rem; padding-bottom: 1rem; }
     .card {
       background: #fff;
       border-radius: 8px;
@@ -70,24 +74,24 @@
   </style>
 </head>
 <body>
-  <p class="back-link"><a href="/home">← 返回首页</a></p>
-  <h1>曲线图查询</h1>
-  <div class="search-bar">
-    <label for="date">日期 <span style="color:#b91c1c">*</span></label>
-    <select id="date">
-      <option value="">请选择或输入下方</option>
-    </select>
-    <input type="text" id="dateInput" placeholder="YYYYMMDD" maxlength="8" pattern="\d{8}" title="8位数字如 20260307">
-    <label for="team">球队名 <span style="color:#b91c1c">*</span></label>
-    <input type="text" id="team" placeholder="主队或客队名称（必填）" required>
-    <button type="button" id="btnSearch">搜索</button>
+  <div class="page">
+    <p class="back-link"><a href="/home">← 返回首页</a></p>
+    <h1>曲线图查询</h1>
+    <div class="search-bar">
+      <label for="dateInput">日期 <span style="color:#b91c1c">*</span></label>
+      <input type="date" id="dateInput" title="请选择日期">
+      <label for="team">球队名</label>
+      <input type="text" id="team" placeholder="主队或客队名称（选填）">
+      <button type="button" id="btnSearch">搜索</button>
+    </div>
+    <p style="margin:0 0 1rem 0; font-size:0.9rem; color:#64748b;">日期必填；球队名选填。留空球队名时会返回该日期全部曲线图。数据来自 football-betting-pipeline 生成的曲线图。</p>
+    <div id="message" class="message" style="display: none;"></div>
+    <div class="results-wrap">
+      <div id="results" class="results"></div>
+    </div>
   </div>
-  <p style="margin:0 0 1rem 0; font-size:0.9rem; color:#64748b;">日期和球队名都需填写才能搜索。数据来自 football-betting-pipeline 生成的曲线图。</p>
-  <div id="message" class="message" style="display: none;"></div>
-  <div id="results" class="results"></div>
 
   <script>
-    const dateSelect = document.getElementById('date');
     const dateInput = document.getElementById('dateInput');
     const teamInput = document.getElementById('team');
     const btnSearch = document.getElementById('btnSearch');
@@ -104,26 +108,24 @@
       messageEl.style.display = 'none';
     }
 
-    function getDate() {
-      const v = dateInput.value.trim() || dateSelect.value;
-      return /^\d{8}$/.test(v) ? v : '';
+    function normalizeDateInput(v) {
+      // YYYY-MM-DD -> YYYYMMDD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v.replace(/-/g, '');
+      // 兼容旧输入（若浏览器不支持 type=date）
+      if (/^\d{8}$/.test(v)) return v;
+      return '';
     }
 
-    async function loadDates() {
-      try {
-        const r = await fetch('/api/curves/dates');
-        const data = await r.json();
-        const dates = data.dates || [];
-        dateSelect.innerHTML = '<option value="">请选择或输入下方</option>';
-        dates.forEach(d => {
-          const opt = document.createElement('option');
-          opt.value = d;
-          opt.textContent = d;
-          dateSelect.appendChild(opt);
-        });
-      } catch (e) {
-        console.warn('加载日期列表失败', e);
-      }
+    function getDate() {
+      const byInput = normalizeDateInput(dateInput.value.trim());
+      return byInput;
+    }
+
+    function dateToInputValue(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
 
     function getAuthHeaders() {
@@ -138,10 +140,6 @@
       const team = teamInput.value.trim();
       if (!date) {
         showMessage('请选择或输入有效日期（YYYYMMDD）', 'error');
-        return;
-      }
-      if (!team) {
-        showMessage('请填写球队名（主队或客队名称）', 'error');
         return;
       }
       btnSearch.disabled = true;
@@ -167,7 +165,12 @@
         }
         const items = data.items || [];
         if (items.length === 0) {
-          showMessage('该条件下没有找到曲线图（若确定目录里有图，可能是队名与文件名不完全一致）。', 'empty');
+          showMessage(
+            team
+              ? '该日期下没有找到与该球队相关的曲线图（若确定目录里有图，可能是队名与文件名不完全一致）。'
+              : '该日期下没有找到曲线图。',
+            'empty'
+          );
           return;
         }
         items.forEach(item => {
@@ -208,18 +211,34 @@
         });
     }
 
-    dateSelect.addEventListener('change', function() {
-      dateInput.value = this.value;
-    });
-    dateInput.addEventListener('input', function() {
-      if (this.value.trim()) dateSelect.value = '';
-    });
+    async function initDefaultSearch() {
+      teamInput.value = '';
+      let isMemberUser = false;
+      try {
+        const r = await fetch('/api/membership/status', { headers: getAuthHeaders() });
+        const data = await r.json();
+        if (r.status === 401 || (data && data.ok === false)) {
+          showMessage('请先登录后再查询。', 'error');
+          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="/login">去登录</a></p>';
+          return;
+        }
+        isMemberUser = !!(data && data.is_member);
+      } catch (e) {
+        // 会员状态获取失败时，默认按非会员初始化，避免误展示会员当天数据。
+        isMemberUser = false;
+      }
+
+      const d = new Date();
+      if (!isMemberUser) d.setDate(d.getDate() - 1);
+      dateInput.value = dateToInputValue(d);
+      await search();
+    }
+
     btnSearch.addEventListener('click', search);
     teamInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') search();
     });
-
-    loadDates();
+    initDefaultSearch();
   </script>
 </body>
 </html>

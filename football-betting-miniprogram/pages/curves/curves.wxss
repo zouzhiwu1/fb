@@ -1,5 +1,8 @@
-.scroll {
-  min-height: 100vh;
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 32rpx;
   padding-bottom: 80rpx;
   box-sizing: border-box;
@@ -7,28 +10,18 @@
 
 .form {
   padding: 32rpx;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 }
 
-.chips {
-  max-height: 72rpx;
-  margin-bottom: 16rpx;
-  white-space: nowrap;
+.results-scroll {
+  flex: 1;
+  min-height: 0;
 }
 
-.chip-row {
-  display: inline-flex;
-  gap: 16rpx;
-  padding: 8rpx 0;
-}
-
-.chip {
-  display: inline-block;
-  padding: 16rpx 24rpx;
-  background: #1f2937;
-  border-radius: 16rpx;
-  font-size: 26rpx;
-  color: #f9fafb;
+.inline-hint {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #9ca3af;
 }
 
 .img-card {
