@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block container_class %} wide{% endblock %}
+{% block title %}推广二维码{% endblock %}
+{% block extra_css %}
+<style>
+  h1 { text-align: left; }
+  .agent-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #e2e8f0; font-size: 15px; }
+  .agent-nav a { color: #15803d; font-weight: 600; text-decoration: none; }
+  .agent-nav a:hover { text-decoration: underline; }
+  .agent-nav a.active { color: #14532d; }
+  .agent-nav .sep { color: #cbd5e1; }
+  .promo-head { margin-bottom: 12px; }
+  .promo-welcome { font-size: 15px; color: #334155; margin-bottom: 8px; }
+  h2.section { text-align: left; font-size: 1.05rem; }
+  .promo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 8px; }
+  .promo-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; text-align: center; }
+  .promo-card h3 { margin: 0 0 8px 0; font-size: 1rem; color: #14532d; }
+  .promo-qr { min-height: 176px; display: flex; align-items: center; justify-content: center; margin: 12px 0; }
+  .promo-qr img { display: block; margin: 0 auto; max-width: 100%; }
+  .promo-meta { text-align: left; margin-top: 8px; }
+  .promo-meta code { font-size: 11px; word-break: break-all; display: block; background: #f8fafc; padding: 8px; border-radius: 6px; margin-top: 4px; }
+  .promo-foot { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+</style>
+{% endblock %}
+{% block content %}
+<nav class="agent-nav">
+  <a href="{{ partner_url_prefix }}/dashboard">明细看板</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/promo" class="active">推广二维码</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/account">账户管理</a>
+  <span class="sep">|</span>
+  <a href="#" id="agent_nav_logout">退出登录</a>
+</nav>
+<div class="promo-head">
+  <h1>推广二维码</h1>
+  <p id="welcome" class="promo-welcome muted">加载中…</p>
+</div>
+<p class="muted" style="font-size:12px;margin-top:-8px;margin-bottom:12px;">请用户扫描对应二维码完成拉新归因。链接在服务器环境变量中配置（见 <code>PARTNER_PROMO_*</code>）；模板里 <code>{agent_id}</code> 为<strong>库内主键</strong>（与明细看板统计用的 <code>users.agent_id</code> 一致），<code>{agent_code}</code> 为<strong>推广码</strong>。未配置时仅显示小程序 path / scene 说明。</p>
+<div id="promo_cards" class="promo-grid"><p class="muted">加载中…</p></div>
+<div class="promo-foot">
+  <a class="text-link" href="{{ partner_url_prefix }}/dashboard">返回明细看板</a>
+  <a class="text-link" href="{{ partner_url_prefix }}/">返回首页</a>
+</div>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(function () {
+  var tokenKey = 'partner_jwt';
+  var token = localStorage.getItem(tokenKey);
+  if (!token) { window.location.href = partnerPath('/login'); return; }
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function parseJson(r) {
+    return r.text().then(function (text) {
+      try { return text ? JSON.parse(text) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function loadPromo() {
+    var box = document.getElementById('promo_cards');
+    fetch(partnerPath('/api/partner/stats/promo-links'), { headers: hdr })
+      .then(parseJson)
+      .then(function (j) {
+        if (!j.ok || !j.channels) {
+          if (j.message === '未登录' || j.message === '登录已失效') {
+            localStorage.removeItem(tokenKey);
+            window.location.href = partnerPath('/login');
+            return;
+          }
+          box.innerHTML = '<p class="muted">推广信息加载失败</p>';
+          return;
+        }
+        box.innerHTML = j.channels.map(function (ch) {
+          return (
+            '<div class="promo-card">' +
+            '<h3>' + esc(ch.title) + '</h3>' +
+            '<p class="muted" style="font-size:12px;text-align:left;line-height:1.4;">' + esc(ch.hint || '') + '</p>' +
+            '<div class="promo-qr" id="promo_qr_' + ch.id + '"></div>' +
+            '<div class="promo-meta" id="promo_meta_' + ch.id + '"></div>' +
+            '</div>'
+          );
+        }).join('');
+        j.channels.forEach(function (ch) {
+          var qEl = document.getElementById('promo_qr_' + ch.id);
+          var mEl = document.getElementById('promo_meta_' + ch.id);
+          if (ch.qr_url && typeof QRCode !== 'undefined') {
+            try {
+              new QRCode(qEl, {
+                text: ch.qr_url,
+                width: 168,
+                height: 168,
+                correctLevel: QRCode.CorrectLevel.M
+              });
+            } catch (e) {
+              qEl.innerHTML = '<p class="muted" style="font-size:12px;">二维码生成失败</p>';
+            }
+          } else {
+            qEl.innerHTML = '<p class="muted" style="font-size:12px;">未配置链接，无法生成二维码</p>';
+          }
+          var parts = [];
+          if (ch.qr_url) {
+            parts.push('<span class="muted" style="font-size:11px;">链接</span><code>' + esc(ch.qr_url) + '</code>');
+          }
+          if (ch.id === 'miniprogram') {
+            if (ch.miniprogram_path) {
+              parts.push('<span class="muted" style="font-size:11px;">小程序路径（供后台生成小程序码）</span><code>' + esc(ch.miniprogram_path) + '</code>');
+            }
+            if (ch.wechat_scene) {
+              parts.push('<span class="muted" style="font-size:11px;">建议 scene（≤32 字符）</span><code>' + esc(ch.wechat_scene) + '</code>');
+            }
+          }
+          mEl.innerHTML = parts.join('');
+        });
+      })
+      .catch(function () {
+        document.getElementById('promo_cards').innerHTML = '<p class="muted">推广信息加载失败</p>';
+      });
+  }
+
+  fetch(partnerPath('/api/partner/auth/me'), { headers: hdr })
+    .then(parseJson)
+    .then(function (me) {
+      if (!me.ok) {
+        localStorage.removeItem(tokenKey);
+        window.location.href = partnerPath('/login');
+        return;
+      }
+      var name = me.agent.real_name || me.agent.display_name || me.agent.login_name;
+      document.getElementById('welcome').textContent =
+        name + '（推广码 ' + me.agent.agent_code + '，库内 ID ' + me.agent.id + '）';
+      loadPromo();
+    })
+    .catch(function () {
+      document.getElementById('welcome').textContent = '加载失败';
+    });
+
+  document.getElementById('agent_nav_logout').addEventListener('click', function (e) {
+    e.preventDefault();
+    localStorage.removeItem(tokenKey);
+    window.location.href = partnerPath('/login');
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,240 @@
+{% extends "admin_root_layout.html" %}
+{% set admin_root_nav = 'managers' %}
+{% block title %}部署根账号 — 管理员一览{% endblock %}
+{% block admin_root_extra_css %}
+<style>
+  h1 { text-align: left; font-size: 1.35rem; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; }
+  input[type="text"], input[type="password"], select { width: 100%; max-width: 320px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+  button.primary { padding: 10px 20px; border-radius: 8px; border: none; background: #1e3a5f; color: #fff; font-size: 14px; cursor: pointer; margin-top: 12px; }
+  button.primary:hover { background: #152a45; }
+  button.linkish { background: none; border: none; color: #15803d; cursor: pointer; text-decoration: underline; padding: 0; font-size: 13px; margin-right: 10px; }
+  button.linkish.danger { color: #b91c1c; }
+  table.mgr { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.mgr th, table.mgr td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  table.mgr th { color: #64748b; font-weight: 600; }
+  .row-gap { margin-top: 14px; }
+  .edit-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+  .edit-overlay.open { display: flex; }
+  .edit-modal { background: #fff; border-radius: 12px; padding: 22px; max-width: 420px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+  .edit-modal h3 { margin: 0 0 14px; font-size: 1.1rem; color: #0f172a; }
+  .edit-modal .row-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .edit-modal .row-btns button { padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; }
+  .edit-modal .row-btns button.primary { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+</style>
+{% endblock %}
+{% block admin_root_body %}
+<h1>管理员一览</h1>
+<p class="muted" style="margin-bottom:18px;">在此添加、修改、删除库内管理员（登录名不可为 root）。代理商业务请在管理员登录后的「代理商一览」操作。</p>
+
+<div class="card">
+  <h2 style="font-size:1.05rem;margin:0 0 12px;">添加管理员</h2>
+  <label for="new_login">登录名</label>
+  <input type="text" id="new_login" autocomplete="off" placeholder="例如 ops01">
+  <div class="row-gap">
+    <label for="new_password">初始密码（至少 6 位）</label>
+    <input type="password" id="new_password" autocomplete="new-password">
+  </div>
+  <button type="button" class="primary" id="btn_add">添加</button>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <table class="mgr">
+    <thead><tr><th>ID</th><th>登录名</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+    <tbody id="tbody_admins"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+  </table>
+</div>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+
+<div id="edit_overlay" class="edit-overlay" aria-hidden="true">
+  <div class="edit-modal" role="dialog" aria-labelledby="edit_title">
+    <h3 id="edit_title">修改管理员</h3>
+    <input type="hidden" id="edit_id">
+    <label for="edit_login">登录名</label>
+    <input type="text" id="edit_login" autocomplete="off">
+    <div class="row-gap">
+      <label for="edit_status">状态</label>
+      <select id="edit_status">
+        <option value="active">active（可用）</option>
+        <option value="disabled">disabled（禁用）</option>
+      </select>
+    </div>
+    <div class="row-gap">
+      <label for="edit_new_password">新密码（留空表示不修改，至少 6 位）</label>
+      <input type="password" id="edit_new_password" autocomplete="new-password">
+    </div>
+    <div id="edit_msg" class="msg error" style="display:none;margin-top:10px;"></div>
+    <div class="row-btns">
+      <button type="button" id="edit_cancel">取消</button>
+      <button type="button" class="primary" id="edit_save">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block admin_root_extra_js %}
+<script>
+(function () {
+  var tokenKey = 'partner_admin_jwt';
+  var token = localStorage.getItem(tokenKey);
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function showErr(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function hideErr() {
+    document.getElementById('msg').style.display = 'none';
+  }
+  function parseJson(r) {
+    return r.text().then(function (text) {
+      try { return text ? JSON.parse(text) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function loadAdmins() {
+    hideErr();
+    fetch(partnerPath('/api/partner/admin/admins'), { headers: hdr }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          localStorage.removeItem('partner_admin_role');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        showErr(j.message || '加载失败');
+        return;
+      }
+      var rows = j.admins || [];
+      var tb = document.getElementById('tbody_admins');
+      if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="muted">暂无库内管理员，请先添加</td></tr>';
+        return;
+      }
+      var count = rows.length;
+      tb.innerHTML = rows.map(function (a) {
+        var delBtn = count <= 1
+          ? '<span class="muted" style="font-size:12px;">不可删（须至少保留一名）</span>'
+          : '<button type="button" class="linkish danger" data-act="del" data-id="' + esc(a.id) + '" data-name="' + esc(a.login_name) + '">删除</button>';
+        return '<tr><td>' + esc(a.id) + '</td><td>' + esc(a.login_name) + '</td><td>' + esc(a.status) + '</td><td>' + esc(a.created_at) + '</td><td>' +
+          '<button type="button" class="linkish" data-act="edit" data-id="' + esc(a.id) + '" data-login="' + esc(a.login_name) + '" data-status="' + esc(a.status) + '">修改</button>' +
+          delBtn + '</td></tr>';
+      }).join('');
+    }).catch(function () { showErr('网络或服务异常'); });
+  }
+
+  document.getElementById('tbody_admins').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    var id = btn.getAttribute('data-id');
+    if (act === 'edit') {
+      document.getElementById('edit_id').value = id;
+      document.getElementById('edit_login').value = btn.getAttribute('data-login') || '';
+      document.getElementById('edit_status').value = btn.getAttribute('data-status') || 'active';
+      document.getElementById('edit_new_password').value = '';
+      document.getElementById('edit_msg').style.display = 'none';
+      var ov = document.getElementById('edit_overlay');
+      ov.classList.add('open');
+      ov.setAttribute('aria-hidden', 'false');
+    }
+    if (act === 'del') {
+      var name = btn.getAttribute('data-name') || id;
+      if (!confirm('确定删除管理员「' + name + '」？此操作不可恢复。')) return;
+      fetch(partnerPath('/api/partner/admin/admins/' + id), { method: 'DELETE', headers: hdr })
+        .then(parseJson).then(function (j) {
+          if (!j.ok) {
+            if (j.message === '未登录' || j.message === '登录已失效') {
+              localStorage.removeItem(tokenKey);
+              localStorage.removeItem('partner_admin_role');
+              window.location.href = partnerPath('/admin/login');
+              return;
+            }
+            showErr(j.message || '删除失败');
+            return;
+          }
+          loadAdmins();
+        }).catch(function () { showErr('网络或服务异常'); });
+    }
+  });
+
+  function closeEdit() {
+    var ov = document.getElementById('edit_overlay');
+    ov.classList.remove('open');
+    ov.setAttribute('aria-hidden', 'true');
+  }
+  document.getElementById('edit_cancel').addEventListener('click', closeEdit);
+  document.getElementById('edit_overlay').addEventListener('click', function (e) {
+    if (e.target.id === 'edit_overlay') closeEdit();
+  });
+  document.getElementById('edit_save').addEventListener('click', function () {
+    var id = document.getElementById('edit_id').value;
+    var login_name = document.getElementById('edit_login').value.trim();
+    var status = document.getElementById('edit_status').value;
+    var np = document.getElementById('edit_new_password').value.trim();
+    var em = document.getElementById('edit_msg');
+    em.style.display = 'none';
+    if (!login_name) { em.textContent = '请填写登录名'; em.style.display = 'block'; return; }
+    if (login_name.toLowerCase() === 'root') { em.textContent = '登录名不可为 root'; em.style.display = 'block'; return; }
+    var body = { login_name: login_name, status: status };
+    if (np.length) {
+      if (np.length < 6) { em.textContent = '新密码至少 6 位'; em.style.display = 'block'; return; }
+      body.new_password = np;
+    }
+    fetch(partnerPath('/api/partner/admin/admins/' + id), {
+      method: 'PUT',
+      headers: hdr,
+      body: JSON.stringify(body)
+    }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          localStorage.removeItem('partner_admin_role');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        em.textContent = j.message || '保存失败';
+        em.style.display = 'block';
+        return;
+      }
+      closeEdit();
+      loadAdmins();
+    }).catch(function () { em.textContent = '网络或服务异常'; em.style.display = 'block'; });
+  });
+
+  document.getElementById('btn_add').addEventListener('click', function () {
+    hideErr();
+    var login_name = document.getElementById('new_login').value.trim();
+    var password = document.getElementById('new_password').value;
+    if (!login_name || !password) { showErr('请填写登录名与密码'); return; }
+    if (login_name.toLowerCase() === 'root') { showErr('登录名不可为 root'); return; }
+    fetch(partnerPath('/api/partner/admin/admins'), {
+      method: 'POST',
+      headers: hdr,
+      body: JSON.stringify({ login_name: login_name, password: password })
+    }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          localStorage.removeItem('partner_admin_role');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        showErr(j.message || '添加失败');
+        return;
+      }
+      document.getElementById('new_login').value = '';
+      document.getElementById('new_password').value = '';
+      loadAdmins();
+    }).catch(function () { showErr('网络或服务异常'); });
+  });
+
+  loadAdmins();
+})();
+</script>
+{% endblock %}

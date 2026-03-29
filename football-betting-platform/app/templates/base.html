@@ -6,30 +6,180 @@
   <title>{% block title %}足球博彩平台{% endblock %}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; margin: 0; padding: 24px; background: #f5f5f5; min-height: 100vh; }
-    .container { max-width: 400px; margin: 0 auto; background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-    h1 { font-size: 1.5rem; margin: 0 0 24px 0; color: #1a1a1a; text-align: center; }
-    label { display: block; margin-bottom: 6px; font-size: 14px; color: #444; font-weight: 500; }
-    input[type="text"], input[type="tel"], input[type="email"], input[type="password"], select { width: 100%; padding: 12px 14px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-    input:focus, select:focus { outline: none; border-color: #2563eb; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: linear-gradient(165deg, #eef2ff 0%, #f1f5f9 45%, #f8fafc 100%);
+      min-height: 100vh;
+      color: #0f172a;
+    }
+    @media (min-width: 768px) {
+      body { padding: 24px 28px; }
+    }
+    .container {
+      max-width: 420px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 28px 22px;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 28px rgba(37, 99, 235, 0.06);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+    }
+    @media (min-width: 480px) {
+      .container:not(.wide) { max-width: 440px; padding: 32px 28px; }
+    }
+    .container.wide {
+      max-width: 100%;
+    }
+    @media (min-width: 768px) {
+      .container.wide { max-width: min(720px, 100% - 32px); }
+    }
+    @media (min-width: 1024px) {
+      .container.wide { max-width: min(960px, 100% - 48px); }
+    }
+    @media (min-width: 1280px) {
+      .container.wide { max-width: min(1120px, 100% - 56px); }
+    }
+    .container.wide h1 { text-align: left; }
+    h1 {
+      font-size: 1.45rem;
+      margin: 0 0 22px 0;
+      color: #1e3a8a;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    label { display: block; margin-bottom: 6px; font-size: 14px; color: #475569; font-weight: 500; }
+    input[type="text"], input[type="tel"], input[type="email"], input[type="password"], select {
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 16px;
+      background: #fafafa;
+    }
+    input:focus, select:focus { outline: none; border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
     select { cursor: pointer; appearance: auto; }
-    button.primary { width: 100%; padding: 14px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; }
-    button.primary:hover { background: #1d4ed8; }
-    button.primary:disabled { background: #94a3b8; cursor: not-allowed; }
-    button.secondary { width: 100%; padding: 10px; background: #e2e8f0; color: #475569; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 8px; }
-    button.secondary:hover { background: #cbd5e1; }
-    .msg { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 14px; }
+    button.primary {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+    button.primary:hover { filter: brightness(1.05); }
+    button.primary:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; filter: none; }
+    button.secondary {
+      width: 100%;
+      padding: 10px;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button.secondary:hover { background: #e2e8f0; }
+    .msg { margin-top: 12px; padding: 12px; border-radius: 10px; font-size: 14px; }
     .msg.success { background: #dcfce7; color: #166534; }
     .msg.error { background: #fee2e2; color: #991b1b; }
     .link-row { text-align: center; margin-top: 20px; font-size: 14px; color: #64748b; }
-    .link-row a { color: #2563eb; text-decoration: none; }
+    .link-row a { color: #2563eb; text-decoration: none; font-weight: 500; }
     .link-row a:hover { text-decoration: underline; }
-    .hint { font-size: 12px; color: #64748b; margin-top: -8px; margin-bottom: 12px; }
+    .hint { font-size: 12px; color: #64748b; margin-top: -8px; margin-bottom: 12px; line-height: 1.5; }
+    .muted { color: #64748b; font-size: 14px; }
+    .nav-links, .app-topnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 14px;
+    }
+    .nav-links a, .app-topnav a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .nav-links a:hover, .app-topnav a:hover { text-decoration: underline; }
+    .app-brand-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px 16px;
+      margin-bottom: 8px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .app-brand-bar .brand { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #3b82f6; }
+    .app-brand-bar h1 {
+      margin: 4px 0 0 0;
+      width: 100%;
+      text-align: left;
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+    .app-brand-bar .welcome-line { width: 100%; margin: 6px 0 0 0; font-size: 15px; color: #64748b; }
+    .app-brand-bar .welcome-line strong { color: #1e40af; font-weight: 600; }
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 20px;
+    }
+    @media (min-width: 640px) {
+      .menu-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1024px) {
+      .menu-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .menu-card {
+      display: block;
+      padding: 18px 20px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: linear-gradient(180deg, #fff 0%, #fafbff 100%);
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .menu-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.1);
+    }
+    .menu-card h3 { margin: 0 0 8px 0; font-size: 1.05rem; color: #1d4ed8; font-weight: 600; }
+    .menu-card p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.5; }
+    .btn-logout-wrap { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    .btn-logout {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 22px;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #e2e8f0;
+    }
+    .btn-logout:hover { background: #e2e8f0; color: #334155; }
   </style>
   {% block extra_css %}{% endblock %}
 </head>
 <body>
-  <div class="container">
+  <div class="container{% block container_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </div>
   {% block extra_js %}{% endblock %}

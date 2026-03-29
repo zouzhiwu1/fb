@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block container_class %} wide{% endblock %}
+{% block title %}代理商主页 — 明细看板{% endblock %}
+{% block extra_css %}
+<style>
+  h1 { text-align: left; }
+  .dash-head { margin-bottom: 8px; }
+  .dash-welcome { font-size: 15px; color: #334155; margin-bottom: 16px; }
+  .dash-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
+  .dash-filter label { margin-bottom: 4px; }
+  .dash-filter input[type="month"] { padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
+  .dash-filter button { width: auto; padding: 10px 20px; margin: 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px; }
+  .kpi .k { font-size: 12px; color: #166534; margin-bottom: 6px; }
+  .kpi .v { font-size: 18px; font-weight: 700; color: #14532d; word-break: break-all; }
+  .kpi.muted .v { font-size: 15px; font-weight: 600; color: #475569; }
+  h2.section { text-align: left; font-size: 1.05rem; }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table.dash { width: 100%; font-size: 13px; border-collapse: collapse; }
+  table.dash th, table.dash td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
+  table.dash th { color: #64748b; font-weight: 600; white-space: nowrap; }
+  table.dash tfoot td { font-weight: 600; background: #f8fafc; }
+  .dash-foot { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .agent-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #e2e8f0; font-size: 15px; }
+  .agent-nav a { color: #15803d; font-weight: 600; text-decoration: none; }
+  .agent-nav a:hover { text-decoration: underline; }
+  .agent-nav a.active { color: #14532d; }
+  .agent-nav .sep { color: #cbd5e1; }
+</style>
+{% endblock %}
+{% block content %}
+<nav class="agent-nav">
+  <a href="{{ partner_url_prefix }}/dashboard" class="active">明细看板</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/promo">推广二维码</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/account">账户管理</a>
+  <span class="sep">|</span>
+  <a href="#" id="agent_nav_logout">退出登录</a>
+</nav>
+<div class="dash-head">
+  <h1>代理商明细看板</h1>
+  <p id="welcome" class="dash-welcome muted">加载中…</p>
+</div>
+
+<div class="dash-filter">
+  <div>
+    <label for="q_month">查询月份</label>
+    <input type="month" id="q_month" name="month">
+  </div>
+  <button type="button" class="primary" id="btn_query">查询</button>
+</div>
+
+<div id="kpi" class="kpi-grid"></div>
+
+<h2 class="section">拉新列表明细</h2>
+<div class="table-wrap card" style="margin-top:0;padding:0;">
+  <table class="dash" id="tbl_ref">
+    <thead><tr><th>用户标识 (脱敏)</th><th>注册时间</th><th>注册奖励</th><th>状态</th></tr></thead>
+    <tbody id="tbody_ref"><tr><td colspan="4" class="muted">请选择月份并查询</td></tr></tbody>
+  </table>
+</div>
+
+<h2 class="section" style="margin-top:28px;">充值列表明细</h2>
+<div class="table-wrap card" style="margin-top:0;padding:0;">
+  <table class="dash" id="tbl_pay">
+    <thead><tr><th>贡献用户</th><th>充值金额</th><th>支付时间</th></tr></thead>
+    <tbody id="tbody_pay"><tr><td colspan="3" class="muted">请选择月份并查询</td></tr></tbody>
+    <tfoot id="tfoot_pay" style="display:none;"><tr><td>合计</td><td id="pay_total">—</td><td></td></tr></tfoot>
+  </table>
+</div>
+
+<p id="notes" class="muted" style="margin-top:16px;font-size:12px;line-height:1.5;"></p>
+
+<div class="dash-foot">
+  <a class="text-link" href="{{ partner_url_prefix }}/">返回首页</a>
+</div>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var tokenKey = 'partner_jwt';
+  var token = localStorage.getItem(tokenKey);
+  if (!token) { window.location.href = partnerPath('/login'); return; }
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function showErr(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function hideErr() {
+    document.getElementById('msg').style.display = 'none';
+  }
+  function parseJson(r) {
+    return r.text().then(function (text) {
+      try { return text ? JSON.parse(text) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function setDefaultMonth() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var el = document.getElementById('q_month');
+    if (!el.value) el.value = y + '-' + m;
+  }
+
+  function renderKpi(s) {
+    var pct = (s.rebate_rate != null ? (Number(s.rebate_rate) * 100).toFixed(2) : '—');
+    var cells = [
+      { k: '总业绩（元）', v: s.performance_total_yuan != null ? s.performance_total_yuan : '—' },
+      { k: '积分（核算）', v: s.points != null ? s.points : '—' },
+      { k: '佣金（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
+      { k: '已结算金额', v: s.settled_commission_yuan != null ? (s.settled_commission_yuan + ' 元') : '—', muted: true },
+      { k: '本月流水积分', v: s.points_ledger_month != null ? s.points_ledger_month : '—' },
+      { k: '返点率', v: pct + '%' },
+      { k: '拉新业绩（元）', v: s.performance_reg_yuan },
+      { k: '充值业绩（元）', v: s.performance_recharge_yuan }
+    ];
+    document.getElementById('kpi').innerHTML = cells.map(function (c) {
+      return '<div class="kpi' + (c.muted ? ' muted' : '') + '"><div class="k">' + esc(c.k) + '</div><div class="v">' + esc(c.v) + '</div></div>';
+    }).join('');
+  }
+
+  function loadBoard() {
+    hideErr();
+    var ym = document.getElementById('q_month').value;
+    if (!ym) { showErr('请选择月份'); return; }
+    var url = partnerPath('/api/partner/stats/monthly-board?month=' + encodeURIComponent(ym));
+    fetch(url, { headers: hdr }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          window.location.href = partnerPath('/login');
+          return;
+        }
+        showErr(j.message || '加载失败');
+        return;
+      }
+      var s = j.summary || {};
+      renderKpi(s);
+      var tbR = document.getElementById('tbody_ref');
+      if (!j.referrals || !j.referrals.length) {
+        tbR.innerHTML = '<tr><td colspan="4" class="muted">本月暂无拉新记录</td></tr>';
+      } else {
+        tbR.innerHTML = j.referrals.map(function (r) {
+          return '<tr><td>' + esc(r.user_mask) + '</td><td>' + esc(r.registered_at) + '</td><td>' + esc(r.register_reward) + '</td><td>' + esc(r.status) + '</td></tr>';
+        }).join('');
+      }
+      var tbP = document.getElementById('tbody_pay');
+      var foot = document.getElementById('tfoot_pay');
+      if (!j.recharges || !j.recharges.length) {
+        tbP.innerHTML = '<tr><td colspan="3" class="muted">本月暂无充值记录</td></tr>';
+        foot.style.display = 'none';
+      } else {
+        tbP.innerHTML = j.recharges.map(function (r) {
+          return '<tr><td>' + esc(r.user_mask) + '</td><td>' + esc(r.amount_yuan) + ' 元</td><td>' + esc(r.paid_at) + '</td></tr>';
+        }).join('');
+        document.getElementById('pay_total').textContent = (j.recharges_total_yuan != null ? j.recharges_total_yuan : '—') + ' 元';
+        foot.style.display = '';
+      }
+      var note = [];
+      if (j.notes) {
+        if (j.notes.formula) note.push(j.notes.formula);
+        if (j.notes.ledger) note.push(j.notes.ledger);
+      }
+      document.getElementById('notes').textContent = note.join(' ');
+    }).catch(function () { showErr('网络或服务异常'); });
+  }
+
+  fetch(partnerPath('/api/partner/auth/me'), { headers: hdr })
+    .then(parseJson)
+    .then(function (me) {
+      if (!me.ok) {
+        localStorage.removeItem(tokenKey);
+        window.location.href = partnerPath('/login');
+        return;
+      }
+      var name = me.agent.real_name || me.agent.display_name || me.agent.login_name;
+      var line = name + '（推广码 ' + me.agent.agent_code + '）';
+      if (me.agent.phone) line += ' · 档案电话已登记';
+      document.getElementById('welcome').textContent = line;
+      setDefaultMonth();
+      loadBoard();
+    })
+    .catch(function () { showErr('加载失败（网络或服务异常）'); });
+
+  document.getElementById('btn_query').addEventListener('click', loadBoard);
+  document.getElementById('agent_nav_logout').addEventListener('click', function (e) {
+    e.preventDefault();
+    localStorage.removeItem(tokenKey);
+    window.location.href = partnerPath('/login');
+  });
+})();
+</script>
+{% endblock %}

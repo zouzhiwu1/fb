@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}代理商门户{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; margin: 0; padding: 24px; background: #f0fdf4; min-height: 100vh; }
+    .container { max-width: 420px; margin: 0 auto; background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .container.wide { max-width: 520px; }
+    h1 { font-size: 1.5rem; margin: 0 0 24px 0; color: #14532d; text-align: center; }
+    label { display: block; margin-bottom: 6px; font-size: 14px; color: #444; font-weight: 500; }
+    input[type="text"], input[type="password"], input[type="number"], input[type="tel"], textarea { width: 100%; padding: 12px 14px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    textarea { min-height: 72px; resize: vertical; font-family: inherit; }
+    input:focus { outline: none; border-color: #15803d; }
+    button.primary { width: 100%; padding: 14px; background: #15803d; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; }
+    button.primary:hover { background: #166534; }
+    button.primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .msg { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 14px; }
+    .msg.error { background: #fee2e2; color: #991b1b; }
+    .card { margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 14px; color: #334155; }
+    .muted { color: #64748b; font-size: 13px; }
+    a.text-link { color: #15803d; font-size: 14px; }
+    a.tile { display: block; text-align: center; padding: 16px 20px; margin-bottom: 12px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; }
+    a.tile.agent { background: #15803d; color: #fff; }
+    a.tile.agent:hover { background: #166534; color: #fff; }
+    a.tile.admin { background: #1e3a5f; color: #fff; }
+    a.tile.admin:hover { background: #152a45; color: #fff; }
+    h2.section { font-size: 1.1rem; margin: 24px 0 12px 0; color: #334155; }
+    table.list { width: 100%; font-size: 13px; border-collapse: collapse; }
+    table.list th, table.list td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    table.list th { color: #64748b; font-weight: 600; }
+    @media (min-width: 768px) {
+      .container { max-width: 520px; }
+      .container.wide { max-width: min(960px, 100% - 48px); }
+    }
+    @media (min-width: 1200px) {
+      .container.wide { max-width: min(1120px, 100% - 48px); }
+    }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <script>
+  window.__PARTNER_URL_PREFIX__ = {{ partner_url_prefix|tojson }};
+  function partnerPath(path) {
+    path = path || '';
+    if (!path.startsWith('/')) path = '/' + path;
+    return (window.__PARTNER_URL_PREFIX__ || '') + path;
+  }
+  </script>
+  <div class="container{% block container_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </div>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

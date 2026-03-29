@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}代理商门户{% endblock %}
+{% block content %}
+<h1>代理商门户</h1>
+<p class="muted" style="text-align:center;margin-bottom:20px;">请选择入口</p>
+<a class="tile agent" href="{{ partner_url_prefix }}/login">代理商登录</a>
+<a class="tile admin" href="{{ partner_url_prefix }}/admin/login">管理员登录</a>
+<p class="muted" style="margin-top:20px;text-align:center;">管理员可为代理商开户；开户成功后代理商使用登录名与初始密码登录。</p>
+{% endblock %}

@@ -19,6 +19,7 @@ CREATE TABLE users (
     phone VARCHAR(20) NOT NULL COMMENT '手机号，注册必填，唯一',
     email VARCHAR(128) NULL COMMENT '邮箱',
     password_hash VARCHAR(255) NULL COMMENT '密码哈希；新注册必填，兼容旧数据可为空',
+    session_version INT NOT NULL DEFAULT 1 COMMENT '登录会话版本号：每次登录自增，旧 token 失效',
     created_at DATETIME NULL COMMENT '记录创建时间（应用层通常为 UTC）',
     updated_at DATETIME NULL COMMENT '记录最后更新时间（应用层通常为 UTC）',
     free_week_granted_at DATETIME NULL COMMENT '新人赠送周会员的生效时间；非空表示已赠送过（每人仅一次）',

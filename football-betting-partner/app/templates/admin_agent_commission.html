@@ -1,0 +1,298 @@
+{% extends "admin_layout.html" %}
+{% set admin_nav = 'list' %}
+{% block title %}管理员 — 佣金{% endblock %}
+{% block admin_extra_css %}
+<style>
+  h1 { text-align: left; }
+  .ab-head { margin-bottom: 12px; }
+  .ab-welcome { font-size: 15px; color: #334155; }
+  .ab-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+  .ab-actions button.primary.admin { width: auto; padding: 10px 20px; margin: 0; background: #166534; }
+  .ab-actions button.primary.admin:hover { background: #14532d; }
+  .dash-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
+  .dash-filter label { margin-bottom: 4px; }
+  .dash-filter input[type="month"] { padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
+  .dash-filter button.primary.admin { width: auto; padding: 10px 20px; margin: 0; background: #1e3a5f; }
+  .dash-filter button.primary.admin:hover { background: #152a45; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px; }
+  .kpi .k { font-size: 12px; color: #166534; margin-bottom: 6px; }
+  .kpi .v { font-size: 18px; font-weight: 700; color: #14532d; word-break: break-all; }
+  .kpi.muted .v { font-size: 15px; font-weight: 600; color: #475569; }
+  h2.section { text-align: left; font-size: 1.05rem; }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table.dash { width: 100%; font-size: 13px; border-collapse: collapse; }
+  table.dash th, table.dash td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
+  table.dash th { color: #64748b; font-weight: 600; white-space: nowrap; }
+  table.dash tfoot td { font-weight: 600; background: #f8fafc; }
+  .ab-foot { margin-top: 20px; }
+  .settle-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+  .settle-overlay.open { display: flex; }
+  .settle-modal { background: #fff; border-radius: 12px; padding: 22px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+  .settle-modal h3 { margin: 0 0 14px; font-size: 1.1rem; color: #0f172a; }
+  .settle-modal label { display: block; font-size: 13px; color: #64748b; margin-bottom: 6px; }
+  .settle-modal .settle-meta { font-size: 13px; color: #334155; margin-bottom: 12px; line-height: 1.5; }
+  .settle-modal .settle-meta strong { color: #0f172a; }
+  .settle-modal .settle-bank { white-space: pre-wrap; word-break: break-all; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 120px; overflow-y: auto; }
+  .settle-modal input[type="number"] { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+  .settle-modal .row-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .settle-modal .row-btns button { padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; }
+  .settle-modal .row-btns button.primary { background: #166534; color: #fff; border-color: #166534; }
+</style>
+{% endblock %}
+{% block admin_body %}
+<h1>佣金</h1>
+<div class="ab-head">
+  <p id="welcome" class="ab-welcome muted">加载中…</p>
+  <p class="muted" style="font-size:12px;margin-top:8px;">数据与代理商「明细看板」一致；线下打款给代理商后，在此登记本次结算金额。</p>
+</div>
+
+<div class="ab-actions">
+  <button type="button" class="primary admin" id="btn_settle_open">结算佣金</button>
+</div>
+
+<div class="dash-filter">
+  <div>
+    <label for="q_month">查询月份</label>
+    <input type="month" id="q_month" name="month">
+  </div>
+  <button type="button" class="primary admin" id="btn_query">查询</button>
+</div>
+
+<div id="kpi" class="kpi-grid"></div>
+
+<h2 class="section">拉新列表明细</h2>
+<div class="table-wrap card" style="margin-top:0;padding:0;">
+  <table class="dash" id="tbl_ref">
+    <thead><tr><th>用户标识 (脱敏)</th><th>注册时间</th><th>注册奖励</th><th>状态</th></tr></thead>
+    <tbody id="tbody_ref"><tr><td colspan="4" class="muted">请选择月份并查询</td></tr></tbody>
+  </table>
+</div>
+
+<h2 class="section" style="margin-top:28px;">充值列表明细</h2>
+<div class="table-wrap card" style="margin-top:0;padding:0;">
+  <table class="dash" id="tbl_pay">
+    <thead><tr><th>贡献用户</th><th>充值金额</th><th>支付时间</th></tr></thead>
+    <tbody id="tbody_pay"><tr><td colspan="3" class="muted">请选择月份并查询</td></tr></tbody>
+    <tfoot id="tfoot_pay" style="display:none;"><tr><td>合计</td><td id="pay_total">—</td><td></td></tr></tfoot>
+  </table>
+</div>
+
+<p id="notes" class="muted" style="margin-top:16px;font-size:12px;line-height:1.5;"></p>
+
+<p class="ab-foot">
+  <a class="text-link" href="{{ partner_url_prefix }}/admin/agents">返回代理商一览</a>
+  · <a class="text-link" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}">查看档案</a>
+  · <a class="text-link" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/edit">修改</a>
+</p>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+
+<div id="settle_overlay" class="settle-overlay" aria-hidden="true">
+  <div class="settle-modal" role="dialog" aria-labelledby="settle_title">
+    <h3 id="settle_title">结算佣金</h3>
+    <p class="settle-meta"><strong>结算月份</strong>：<span id="settle_ym_display">—</span></p>
+    <p class="settle-meta"><strong>代理商银行账户</strong>（将写入结算记录）</p>
+    <div id="settle_bank_display" class="settle-bank muted">—</div>
+    <label for="settle_amount">结算金额（元）</label>
+    <input type="number" id="settle_amount" step="0.01" min="0.01" placeholder="例如 100.00">
+    <div id="settle_msg" class="msg error" style="display:none;margin-top:10px;"></div>
+    <div class="row-btns">
+      <button type="button" id="settle_cancel">取消</button>
+      <button type="button" class="primary" id="settle_confirm">确认</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block admin_extra_js %}
+<script>
+(function () {
+  var agentId = {{ agent_id|tojson }};
+  var tokenKey = 'partner_admin_jwt';
+  var token = localStorage.getItem(tokenKey);
+  if (!token) { window.location.href = partnerPath('/admin/login'); return; }
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function showErr(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function hideErr() {
+    document.getElementById('msg').style.display = 'none';
+  }
+  function parseJson(r) {
+    return r.text().then(function (text) {
+      try { return text ? JSON.parse(text) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function setDefaultMonth() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var el = document.getElementById('q_month');
+    if (!el.value) el.value = y + '-' + m;
+  }
+  function renderKpi(s) {
+    var pct = (s.rebate_rate != null ? (Number(s.rebate_rate) * 100).toFixed(2) : '—');
+    var settled = s.settled_commission_yuan != null ? (s.settled_commission_yuan + ' 元') : '—';
+    var cells = [
+      { k: '总业绩（元）', v: s.performance_total_yuan != null ? s.performance_total_yuan : '—' },
+      { k: '积分（核算）', v: s.points != null ? s.points : '—' },
+      { k: '佣金（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
+      { k: '已结算金额', v: settled, muted: true },
+      { k: '本月流水积分', v: s.points_ledger_month != null ? s.points_ledger_month : '—' },
+      { k: '返点率', v: pct + '%' },
+      { k: '拉新业绩（元）', v: s.performance_reg_yuan },
+      { k: '充值业绩（元）', v: s.performance_recharge_yuan }
+    ];
+    document.getElementById('kpi').innerHTML = cells.map(function (c) {
+      return '<div class="kpi' + (c.muted ? ' muted' : '') + '"><div class="k">' + esc(c.k) + '</div><div class="v">' + esc(c.v) + '</div></div>';
+    }).join('');
+  }
+  function loadBoard() {
+    hideErr();
+    var ym = document.getElementById('q_month').value;
+    if (!ym) { showErr('请选择月份'); return; }
+    var url = partnerPath('/api/partner/admin/agents/' + agentId + '/monthly-board?month=' + encodeURIComponent(ym));
+    fetch(url, { headers: hdr }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        showErr(j.message || '加载失败');
+        return;
+      }
+      var s = j.summary || {};
+      renderKpi(s);
+      var tbR = document.getElementById('tbody_ref');
+      if (!j.referrals || !j.referrals.length) {
+        tbR.innerHTML = '<tr><td colspan="4" class="muted">本月暂无拉新记录</td></tr>';
+      } else {
+        tbR.innerHTML = j.referrals.map(function (r) {
+          return '<tr><td>' + esc(r.user_mask) + '</td><td>' + esc(r.registered_at) + '</td><td>' + esc(r.register_reward) + '</td><td>' + esc(r.status) + '</td></tr>';
+        }).join('');
+      }
+      var tbP = document.getElementById('tbody_pay');
+      var foot = document.getElementById('tfoot_pay');
+      if (!j.recharges || !j.recharges.length) {
+        tbP.innerHTML = '<tr><td colspan="3" class="muted">本月暂无充值记录</td></tr>';
+        foot.style.display = 'none';
+      } else {
+        tbP.innerHTML = j.recharges.map(function (r) {
+          return '<tr><td>' + esc(r.user_mask) + '</td><td>' + esc(r.amount_yuan) + ' 元</td><td>' + esc(r.paid_at) + '</td></tr>';
+        }).join('');
+        document.getElementById('pay_total').textContent = (j.recharges_total_yuan != null ? j.recharges_total_yuan : '—') + ' 元';
+        foot.style.display = '';
+      }
+      var note = [];
+      if (j.notes) {
+        if (j.notes.formula) note.push(j.notes.formula);
+        if (j.notes.ledger) note.push(j.notes.ledger);
+      }
+      document.getElementById('notes').textContent = note.join(' ');
+    }).catch(function () { showErr('网络或服务异常'); });
+  }
+
+  var overlay = document.getElementById('settle_overlay');
+  var settleMsg = document.getElementById('settle_msg');
+  var settleInput = document.getElementById('settle_amount');
+  var agentBankSnapshot = '';
+
+  function openSettle() {
+    var ym = document.getElementById('q_month').value;
+    if (!ym) {
+      showErr('请先选择查询月份，再结算佣金');
+      return;
+    }
+    settleMsg.style.display = 'none';
+    settleInput.value = '';
+    document.getElementById('settle_ym_display').textContent = ym;
+    document.getElementById('settle_bank_display').textContent = agentBankSnapshot || '（档案中暂无，仍将保存为空）';
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    settleInput.focus();
+  }
+  function closeSettle() {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('btn_settle_open').addEventListener('click', openSettle);
+  document.getElementById('settle_cancel').addEventListener('click', closeSettle);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeSettle();
+  });
+  document.getElementById('settle_confirm').addEventListener('click', function () {
+    settleMsg.style.display = 'none';
+    var raw = (settleInput.value || '').trim();
+    var n = parseFloat(raw);
+    if (!raw || !(n > 0)) {
+      settleMsg.textContent = '请输入大于 0 的结算金额';
+      settleMsg.style.display = 'block';
+      return;
+    }
+    var ymSettle = document.getElementById('q_month').value;
+    if (!ymSettle) {
+      settleMsg.textContent = '请选择结算月份';
+      settleMsg.style.display = 'block';
+      return;
+    }
+    var url = partnerPath('/api/partner/admin/agents/' + agentId + '/commission/settle');
+    fetch(url, {
+      method: 'POST',
+      headers: hdr,
+      body: JSON.stringify({ amount_yuan: raw, settlement_month: ymSettle })
+    }).then(parseJson).then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        settleMsg.textContent = j.message || '结算失败';
+        settleMsg.style.display = 'block';
+        return;
+      }
+      closeSettle();
+      loadBoard();
+    }).catch(function () {
+      settleMsg.textContent = '网络或服务异常';
+      settleMsg.style.display = 'block';
+    });
+  });
+
+  fetch(partnerPath('/api/partner/admin/agents/' + agentId), { headers: hdr })
+    .then(parseJson)
+    .then(function (j) {
+      if (!j.ok) {
+        if (j.message === '未登录' || j.message === '登录已失效') {
+          localStorage.removeItem(tokenKey);
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        document.getElementById('welcome').textContent = j.message || '代理商不存在';
+        return;
+      }
+      var a = j.agent;
+      document.getElementById('welcome').textContent =
+        'ID ' + a.id + ' · ' + (a.real_name || a.display_name || a.login_name) + ' · 推广码 ' + a.agent_code + ' · 登录名 ' + a.login_name;
+      var ba = (a.bank_account || '').trim();
+      var bi = (a.bank_info || '').trim();
+      agentBankSnapshot = ba && bi ? (ba + '\n' + bi) : (ba || bi || '');
+      setDefaultMonth();
+      loadBoard();
+    })
+    .catch(function () {
+      document.getElementById('welcome').textContent = '加载失败';
+    });
+
+  document.getElementById('btn_query').addEventListener('click', loadBoard);
+})();
+</script>
+{% endblock %}

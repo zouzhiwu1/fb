@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block container_class %} wide{% endblock %}
+{% block extra_css %}
+<style>
+  .admin-nav { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+  .admin-nav a { color: #1e3a5f; font-weight: 600; text-decoration: none; font-size: 15px; }
+  .admin-nav a:hover { text-decoration: underline; }
+  .admin-nav a.active { color: #15803d; }
+  .admin-nav .sep { color: #cbd5e1; }
+  .muted { color: #64748b; font-size: 13px; }
+</style>
+{% block admin_root_extra_css %}{% endblock %}
+{% endblock %}
+{% block content %}
+<nav class="admin-nav">
+  <a href="{{ partner_url_prefix }}/admin/managers"{% if admin_root_nav == 'managers' %} class="active"{% endif %}>管理员一览</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/">首页</a>
+  <span class="sep">|</span>
+  <a href="#" id="admin_root_nav_logout">退出登录</a>
+</nav>
+{% block admin_root_body %}{% endblock %}
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var tokenKey = 'partner_admin_jwt';
+  var roleKey = 'partner_admin_role';
+  var token = localStorage.getItem(tokenKey);
+  if (!token) {
+    window.location.href = partnerPath('/admin/login');
+    return;
+  }
+  var hdr = { 'Authorization': 'Bearer ' + token };
+  fetch(partnerPath('/api/partner/auth/admin/whoami'), { headers: hdr })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j.ok || j.role !== 'root') {
+        localStorage.removeItem(tokenKey);
+        localStorage.removeItem(roleKey);
+        window.location.href = partnerPath('/admin/login');
+      }
+    })
+    .catch(function () {
+      localStorage.removeItem(tokenKey);
+      localStorage.removeItem(roleKey);
+      window.location.href = partnerPath('/admin/login');
+    });
+  var lo = document.getElementById('admin_root_nav_logout');
+  if (lo) {
+    lo.addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem(tokenKey);
+      localStorage.removeItem(roleKey);
+      window.location.href = partnerPath('/admin/login');
+    });
+  }
+})();
+</script>
+{% block admin_root_extra_js %}{% endblock %}
+{% endblock %}

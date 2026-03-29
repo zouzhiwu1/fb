@@ -36,7 +36,7 @@ _nohup_fallback() {
       sleep 1
     fi
   fi
-  nohup "$PY" "${ROOT}/run.py" >/dev/null 2>&1 &
+  nohup "$PY" "${ROOT}/run.py" >>"$PLATFORM_LOG" 2>&1 &
   echo $! >"$PID_FILE"
   echo "已在后台启动，PID=$(cat "$PID_FILE")"
   echo "业务日志: ${PLATFORM_LOG}"

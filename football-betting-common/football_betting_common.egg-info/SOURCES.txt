@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+football_betting_common/__init__.py
+football_betting_common/env.py
+football_betting_common/mysql.py
+football_betting_common.egg-info/PKG-INFO
+football_betting_common.egg-info/SOURCES.txt
+football_betting_common.egg-info/dependency_links.txt
+football_betting_common.egg-info/requires.txt
+football_betting_common.egg-info/top_level.txt

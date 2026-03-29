@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}代理商登录{% endblock %}
+{% block content %}
+<h1>代理商登录</h1>
+<label for="login_name">登录名</label>
+<input id="login_name" type="text" autocomplete="username" placeholder="login_name">
+<label for="password">密码</label>
+<input id="password" type="password" autocomplete="current-password">
+<button type="button" class="primary" id="btn">登录</button>
+<div id="msg" class="msg error" style="display:none;"></div>
+<p class="muted" style="margin-top:16px;">独立服务，与 C 端平台 JWT 隔离。默认端口 5002。</p>
+<p><a class="text-link" href="{{ partner_url_prefix }}/">返回首页</a></p>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var tokenKey = 'partner_jwt';
+  if (localStorage.getItem(tokenKey)) {
+    window.location.href = partnerPath('/dashboard');
+    return;
+  }
+  var btn = document.getElementById('btn');
+  var msg = document.getElementById('msg');
+  function showErr(t) {
+    msg.textContent = t;
+    msg.style.display = 'block';
+  }
+  btn.addEventListener('click', function () {
+    var login_name = document.getElementById('login_name').value.trim();
+    var password = document.getElementById('password').value;
+    if (!login_name || !password) { showErr('请输入账号和密码'); return; }
+    btn.disabled = true;
+    msg.style.display = 'none';
+    fetch(partnerPath('/api/partner/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login_name: login_name, password: password })
+    }).then(function (r) {
+      return r.text().then(function (text) {
+        var j = {};
+        try { j = text ? JSON.parse(text) : {}; } catch (e) {
+          return { ok: r.ok, j: {}, badBody: true, status: r.status, text: text };
+        }
+        return { ok: r.ok, j: j, status: r.status };
+      });
+    }).then(function (x) {
+        btn.disabled = false;
+        if (x.badBody) {
+          showErr('请求失败 HTTP ' + x.status + '，请确认 PARTNER_APPLICATION_PREFIX 与反代路径一致，或查看服务日志。');
+          return;
+        }
+        if (!x.ok || !x.j.ok) { showErr(x.j.message || '登录失败'); return; }
+        localStorage.setItem(tokenKey, x.j.token);
+        window.location.href = partnerPath('/dashboard');
+      })
+      .catch(function () {
+        btn.disabled = false;
+        showErr('网络错误（无法连接服务器）');
+      });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,24 +1,38 @@
 {% extends "base.html" %}
 {% block title %}首页 - 足球博彩平台{% endblock %}
+{% block container_class %} wide{% endblock %}
 {% block content %}
-  <h1>欢迎，<span id="username"></span></h1>
-  <p style="color:#64748b; margin-bottom: 16px;">您已登录。</p>
-  <p style="margin-bottom: 12px;">
-    <a href="/account" style="color:#2563eb; text-decoration:none;">账户资料</a> — 查看注册信息，修改密码、手机号、邮箱
-  </p>
-  <p style="margin-bottom: 12px;">
-    <a href="/membership" style="color:#2563eb; text-decoration:none;">会员信息</a> — 会员状态、到期时间与当前权益明细
-  </p>
-  <p style="margin-bottom: 12px;">
-    <a href="/recharge" style="color:#2563eb; text-decoration:none;">会员充值</a> — 选择档位创建订单（支付宝 / 微信）
-  </p>
-  <p style="margin-bottom: 16px;">
-    <a href="/recharge-records" style="color:#2563eb; text-decoration:none;">充值信息</a> — 查询订单与支付状态
-  </p>
-  <p style="margin-bottom: 24px;">
-    <a href="/curves" style="color:#2563eb; text-decoration:none;">曲线图查询</a> — 按日期、球队名搜索并查看曲线图
-  </p>
-  <a href="/login" id="logout-link" style="display:inline-block; padding:12px 24px; background:#e2e8f0; color:#475569; border-radius:8px; text-decoration:none; font-size:14px;">退出登录</a>
+  <div class="app-brand-bar">
+    <span class="brand">足球博彩平台</span>
+    <h1>欢迎回来</h1>
+    <p class="welcome-line">已登录为 <strong id="username"></strong></p>
+  </div>
+  <p class="muted" style="margin: 0 0 4px 0;">选择功能</p>
+  <div class="menu-grid">
+    <a class="menu-card" href="/account">
+      <h3>账户资料</h3>
+      <p>查看注册信息，修改密码、手机号与邮箱</p>
+    </a>
+    <a class="menu-card" href="/membership">
+      <h3>会员信息</h3>
+      <p>会员状态、到期时间与当前权益明细</p>
+    </a>
+    <a class="menu-card" href="/recharge">
+      <h3>会员充值</h3>
+      <p>选择档位创建订单（支付宝 / 微信）</p>
+    </a>
+    <a class="menu-card" href="/recharge-records">
+      <h3>充值信息</h3>
+      <p>查询订单与支付状态</p>
+    </a>
+    <a class="menu-card" href="/curves">
+      <h3>曲线图查询</h3>
+      <p>按日期、球队名搜索并查看曲线图</p>
+    </a>
+  </div>
+  <div class="btn-logout-wrap">
+    <a href="/login" class="btn-logout" id="logout-link">退出登录</a>
+  </div>
 {% endblock %}
 {% block extra_js %}
 <script>

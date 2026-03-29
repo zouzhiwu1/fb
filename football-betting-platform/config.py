@@ -5,62 +5,34 @@
 import datetime
 import logging
 import os
-from urllib.parse import urlparse, unquote
+from football_betting_common import (
+    ensure_mysql_user_not_placeholder,
+    get_sqlalchemy_engine_options as _get_sqlalchemy_engine_options,
+    load_dotenv_stack,
+)
 
-try:
-    from dotenv import load_dotenv
-
-    _cfg_dir = os.path.dirname(os.path.abspath(__file__))
-    _repo_root = os.path.dirname(_cfg_dir)
-    # 仓库根目录 .env → 子项目 .env → 当前工作目录（后者仅补充未出现的键）
-    load_dotenv(os.path.join(_repo_root, ".env"))
-    load_dotenv(os.path.join(_cfg_dir, ".env"))
-    load_dotenv()
-except ImportError:
-    pass
+_service_root = os.path.dirname(os.path.abspath(__file__))
+load_dotenv_stack(_service_root)
 
 # MySQL
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "mysql+pymysql://root:123456@localhost:3306/football_betting"
+    "mysql+pymysql://root:123456@localhost:3306/football_betting",
 )
 
-# 占位符检测：若未修改 .env 会提示
-_DB_PLACEHOLDERS = ("用户", "密码", "YOUR_MYSQL_USER", "YOUR_MYSQL_PASSWORD")
-_parsed = urlparse(DATABASE_URL)
-_db_user = unquote(_parsed.username or "")
-if _db_user in _DB_PLACEHOLDERS:
-    raise ValueError(
+ensure_mysql_user_not_placeholder(
+    DATABASE_URL,
+    error_message=(
         "请在项目根目录的 .env 文件中配置真实的 MySQL 用户名和密码。\n"
         "将 DATABASE_URL 改为例如：mysql+pymysql://root:你的密码@localhost:3306/football_betting\n"
         "（不要使用“用户”“密码”或 YOUR_MYSQL_USER 等占位符）"
-    )
-
-
-def _pymysql_creator():
-    """
-    PyMySQL 默认用 latin-1 编码密码，中文等非 ASCII 会报错。
-    用自定义 creator 把密码按 UTF-8 转成 PyMySQL 能发送的格式。
-    """
-    import pymysql
-    parsed = urlparse(DATABASE_URL)
-    password = unquote(parsed.password) if parsed.password else ""
-    if password:
-        # 使 password.encode('latin1') 等于 UTF-8 字节，这样 PyMySQL 发出去的就是正确密码
-        password = password.encode("utf-8").decode("latin-1")
-    return pymysql.connect(
-        host=parsed.hostname or "localhost",
-        port=parsed.port or 3306,
-        user=unquote(parsed.username) if parsed.username else None,
-        password=password,
-        database=(parsed.path or "/").strip("/").split("/")[0] or None,
-        charset="utf8mb4",
-    )
+    ),
+)
 
 
 def get_sqlalchemy_engine_options():
     """若使用 PyMySQL 且密码可能含非 ASCII，用自定义 creator 避免 UnicodeEncodeError。"""
-    return {"creator": _pymysql_creator}
+    return _get_sqlalchemy_engine_options(DATABASE_URL)
 
 # JWT（RFC 7518 建议 HS256 密钥至少 32 字节，否则会触发 InsecureKeyLengthWarning）
 JWT_SECRET_KEY = os.environ.get(

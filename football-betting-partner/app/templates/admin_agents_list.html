@@ -1,0 +1,55 @@
+{% extends "admin_layout.html" %}
+{% set admin_nav = 'list' %}
+{% block title %}管理员 — 代理商一览{% endblock %}
+{% block admin_body %}
+<h1>代理商一览</h1>
+<p class="muted">查看、编辑代理商；新开户请点导航「注册代理商」。代理商开户后不可删除。</p>
+<div id="list_wrap" class="card" style="overflow-x:auto;">加载中…</div>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+{% endblock %}
+{% block admin_extra_js %}
+<script>
+(function () {
+  var token = localStorage.getItem('partner_admin_jwt');
+  var hdr = { 'Authorization': 'Bearer ' + token };
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function loadList() {
+    fetch(partnerPath('/api/partner/admin/agents'), { headers: hdr })
+      .then(function (r) { return r.json().then(function (j) { return { r: r, j: j }; }); })
+      .then(function (x) {
+        if (x.r.status === 401) {
+          localStorage.removeItem('partner_admin_jwt');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        if (!x.j.ok) {
+          document.getElementById('list_wrap').textContent = x.j.message || '加载失败';
+          return;
+        }
+        var rows = x.j.agents || [];
+        if (!rows.length) {
+          document.getElementById('list_wrap').innerHTML = '<p class="muted">暂无代理商，请前往「注册代理商」。</p>';
+          return;
+        }
+        var h = '<table class="list"><thead><tr><th>ID</th><th>推广码</th><th>登录名</th><th>姓名</th><th>电话</th><th>返点率</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+        rows.forEach(function (a) {
+          h += '<tr><td>' + esc(a.id) + '</td><td>' + esc(a.agent_code) + '</td><td>' + esc(a.login_name) + '</td><td>' + esc(a.real_name || '—') + '</td><td>' + esc(a.phone || '—') + '</td><td>' + esc(a.current_rate) + '</td><td>' + esc(a.status) + '</td><td class="row-actions">';
+          h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id)) + '">查看</a>';
+          h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id + '/edit')) + '">修改</a>';
+          h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id + '/commission')) + '">佣金</a>';
+          h += '</td></tr>';
+        });
+        h += '</tbody></table>';
+        document.getElementById('list_wrap').innerHTML = h;
+      })
+      .catch(function () {
+        document.getElementById('list_wrap').textContent = '网络错误';
+      });
+  }
+  loadList();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block container_class %} wide{% endblock %}
+{% block title %}账户管理{% endblock %}
+{% block extra_css %}
+<style>
+  h1 { text-align: left; }
+  .agent-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #e2e8f0; font-size: 15px; }
+  .agent-nav a { color: #15803d; font-weight: 600; text-decoration: none; }
+  .agent-nav a:hover { text-decoration: underline; }
+  .agent-nav a.active { color: #14532d; }
+  .agent-nav .sep { color: #cbd5e1; }
+  h2.section { text-align: left; font-size: 1.05rem; margin-top: 8px; }
+  .readonly { background: #f1f5f9; color: #64748b; }
+  button.primary { max-width: 280px; }
+  button.ghost { width: 100%; max-width: 280px; padding: 12px; margin-top: 8px; background: #e2e8f0; color: #334155; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  button.ghost:hover { background: #cbd5e1; }
+</style>
+{% endblock %}
+{% block content %}
+<nav class="agent-nav">
+  <a href="{{ partner_url_prefix }}/dashboard">明细看板</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/promo">推广二维码</a>
+  <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/account" class="active">账户管理</a>
+  <span class="sep">|</span>
+  <a href="#" id="agent_nav_logout">退出登录</a>
+</nav>
+
+<h1>账户管理</h1>
+<p class="muted">可修改本人档案、联系方式与登录密码。登录名、推广码、返点率由管理员维护，不可在此修改。</p>
+
+<h2 class="section">只读信息</h2>
+<label>登录名</label>
+<input type="text" id="ro_login_name" class="readonly" readonly>
+<label>推广码</label>
+<input type="text" id="ro_agent_code" class="readonly" readonly>
+<label>本月返点率</label>
+<input type="text" id="ro_rate" class="readonly" readonly>
+
+<h2 class="section">档案与收款信息</h2>
+<label for="display_name">显示名</label>
+<input type="text" id="display_name" name="display_name" autocomplete="nickname">
+<label for="real_name">用户姓名</label>
+<input type="text" id="real_name" name="real_name" autocomplete="name">
+<label for="age">年龄</label>
+<input type="number" id="age" name="age" min="1" max="120" placeholder="选填">
+<label for="phone">电话号码</label>
+<input type="tel" id="phone" name="phone" autocomplete="tel" placeholder="用于联系与佣金核对">
+<label for="bank_account">银行账户</label>
+<textarea id="bank_account" name="bank_account" placeholder="开户名、开户行、卡号等"></textarea>
+<label for="contact">其他联系方式（选填）</label>
+<input type="text" id="contact" name="contact" placeholder="微信、备用电话等">
+<label for="bank_info">补充银行信息（选填）</label>
+<textarea id="bank_info" name="bank_info" placeholder="分行、联行号等"></textarea>
+
+<h2 class="section">修改密码</h2>
+<p class="muted" style="margin-top:-8px;">不修改请留空以下三项。</p>
+<label for="current_password">当前密码</label>
+<input type="password" id="current_password" autocomplete="current-password">
+<label for="new_password">新密码（至少 6 位）</label>
+<input type="password" id="new_password" autocomplete="new-password">
+<label for="new_password2">确认新密码</label>
+<input type="password" id="new_password2" autocomplete="new-password">
+
+<button type="button" class="primary" id="btn_save">保存修改</button>
+<button type="button" class="ghost" id="btn_back">返回明细看板</button>
+
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+<div id="okmsg" class="msg" style="display:none;margin-top:12px;background:#dcfce7;color:#166534;"></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var tokenKey = 'partner_jwt';
+  var token = localStorage.getItem(tokenKey);
+  if (!token) { window.location.href = partnerPath('/login'); return; }
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  function showErr(t) {
+    document.getElementById('okmsg').style.display = 'none';
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function showOk(t) {
+    document.getElementById('msg').style.display = 'none';
+    var m = document.getElementById('okmsg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function parseJson(r) {
+    return r.text().then(function (text) {
+      try { return text ? JSON.parse(text) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+  function fill(a) {
+    document.getElementById('ro_login_name').value = a.login_name || '';
+    document.getElementById('ro_agent_code').value = a.agent_code || '';
+    var r = a.current_rate != null ? (Number(a.current_rate) * 100).toFixed(2) + '%' : '—';
+    document.getElementById('ro_rate').value = r;
+    document.getElementById('display_name').value = a.display_name || '';
+    document.getElementById('real_name').value = a.real_name || '';
+    document.getElementById('age').value = a.age != null ? String(a.age) : '';
+    document.getElementById('phone').value = a.phone || '';
+    document.getElementById('bank_account').value = a.bank_account || '';
+    document.getElementById('contact').value = a.contact || '';
+    document.getElementById('bank_info').value = a.bank_info || '';
+  }
+  fetch(partnerPath('/api/partner/auth/me'), { headers: hdr })
+    .then(parseJson)
+    .then(function (j) {
+      if (!j.ok) {
+        localStorage.removeItem(tokenKey);
+        window.location.href = partnerPath('/login');
+        return;
+      }
+      fill(j.agent);
+    })
+    .catch(function () { showErr('加载失败'); });
+
+  document.getElementById('btn_back').addEventListener('click', function () {
+    window.location.href = partnerPath('/dashboard');
+  });
+  document.getElementById('btn_save').addEventListener('click', function () {
+    document.getElementById('msg').style.display = 'none';
+    document.getElementById('okmsg').style.display = 'none';
+    var np = document.getElementById('new_password').value;
+    var np2 = document.getElementById('new_password2').value;
+    if (np || np2) {
+      if (np !== np2) { showErr('两次输入的新密码不一致'); return; }
+      if (np.length < 6) { showErr('新密码至少 6 位'); return; }
+      if (!document.getElementById('current_password').value) { showErr('修改密码请填写当前密码'); return; }
+    }
+    var body = {
+      display_name: document.getElementById('display_name').value.trim(),
+      real_name: document.getElementById('real_name').value.trim(),
+      age: document.getElementById('age').value,
+      phone: document.getElementById('phone').value.trim(),
+      bank_account: document.getElementById('bank_account').value.trim(),
+      contact: document.getElementById('contact').value.trim(),
+      bank_info: document.getElementById('bank_info').value.trim()
+    };
+    if (np) {
+      body.current_password = document.getElementById('current_password').value;
+      body.new_password = np;
+    }
+    var btn = document.getElementById('btn_save');
+    btn.disabled = true;
+    fetch(partnerPath('/api/partner/auth/me'), { method: 'PUT', headers: hdr, body: JSON.stringify(body) })
+      .then(parseJson)
+      .then(function (j) {
+        btn.disabled = false;
+        if (!j.ok) {
+          if (j.message === '未登录' || j.message === '登录已失效') {
+            localStorage.removeItem(tokenKey);
+            window.location.href = partnerPath('/login');
+            return;
+          }
+          showErr(j.message || '保存失败');
+          return;
+        }
+        if (j.token) {
+          localStorage.setItem(tokenKey, j.token);
+          token = j.token;
+          hdr.Authorization = 'Bearer ' + j.token;
+        }
+        fill(j.agent);
+        document.getElementById('current_password').value = '';
+        document.getElementById('new_password').value = '';
+        document.getElementById('new_password2').value = '';
+        showOk('已保存。' + (j.token ? ' 密码已更新，请牢记新密码。' : ''));
+      })
+      .catch(function () {
+        btn.disabled = false;
+        showErr('网络错误');
+      });
+  });
+  document.getElementById('agent_nav_logout').addEventListener('click', function (e) {
+    e.preventDefault();
+    localStorage.removeItem(tokenKey);
+    window.location.href = partnerPath('/login');
+  });
+})();
+</script>
+{% endblock %}

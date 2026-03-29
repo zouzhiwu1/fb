@@ -1,0 +1,68 @@
+{% extends "admin_layout.html" %}
+{% block title %}管理员 — 查看代理商{% endblock %}
+{% block admin_body %}
+<h1>查看代理商</h1>
+<p class="muted">只读信息；需要变更请点「修改」。</p>
+<div id="view_wrap" class="card">加载中…</div>
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+<p class="row-actions" style="margin-top:20px;">
+  <a class="text-link" href="{{ partner_url_prefix }}/admin/agents">返回一览</a>
+  <a class="text-link" id="link_board" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/commission">佣金</a>
+  <a class="text-link" id="link_edit" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/edit">修改</a>
+</p>
+{% endblock %}
+{% block admin_extra_js %}
+<script>
+(function () {
+  var agentId = {{ agent_id|tojson }};
+  var tokenKey = 'partner_admin_jwt';
+  var token = localStorage.getItem(tokenKey);
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function showErr(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function render(a) {
+    var h = '<dl class="view-dl">';
+    h += '<dt>ID</dt><dd>' + esc(a.id) + '</dd>';
+    h += '<dt>推广码</dt><dd>' + esc(a.agent_code) + '</dd>';
+    h += '<dt>登录名</dt><dd>' + esc(a.login_name) + '</dd>';
+    h += '<dt>显示名</dt><dd>' + esc(a.display_name || '—') + '</dd>';
+    h += '<dt>用户姓名</dt><dd>' + esc(a.real_name || '—') + '</dd>';
+    h += '<dt>年龄</dt><dd>' + (a.age != null ? esc(a.age) : '—') + '</dd>';
+    h += '<dt>电话</dt><dd>' + esc(a.phone || '—') + '</dd>';
+    h += '<dt>银行账户</dt><dd>' + esc(a.bank_account || '—') + '</dd>';
+    h += '<dt>本月返点率</dt><dd>' + esc(a.current_rate) + '</dd>';
+    h += '<dt>状态</dt><dd>' + esc(a.status) + '</dd>';
+    h += '<dt>创建时间</dt><dd>' + esc(a.created_at || '—') + '</dd>';
+    h += '</dl>';
+    document.getElementById('view_wrap').innerHTML = h;
+  }
+  fetch(partnerPath('/api/partner/admin/agents/' + agentId), { headers: hdr })
+    .then(function (r) { return r.json().then(function (j) { return { r: r, j: j }; }); })
+    .then(function (x) {
+      if (x.r.status === 401) {
+        localStorage.removeItem(tokenKey);
+        window.location.href = partnerPath('/admin/login');
+        return;
+      }
+      if (x.r.status === 404 || !x.j.ok) {
+        document.getElementById('view_wrap').innerHTML = '<p class="muted">' + esc(x.j.message || '代理商不存在') + '</p>';
+        document.getElementById('link_edit').style.display = 'none';
+        var lb = document.getElementById('link_board');
+        if (lb) lb.style.display = 'none';
+        return;
+      }
+      render(x.j.agent);
+    })
+    .catch(function () {
+      document.getElementById('view_wrap').textContent = '网络错误';
+    });
+})();
+</script>
+{% endblock %}
