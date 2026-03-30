@@ -31,12 +31,15 @@
     var h = '<dl class="view-dl">';
     h += '<dt>ID</dt><dd>' + esc(a.id) + '</dd>';
     h += '<dt>推广码</dt><dd>' + esc(a.agent_code) + '</dd>';
-    h += '<dt>登录名</dt><dd>' + esc(a.login_name) + '</dd>';
+    h += '<dt>登录名（邮箱）</dt><dd>' + esc(a.login_name) + '</dd>';
     h += '<dt>显示名</dt><dd>' + esc(a.display_name || '—') + '</dd>';
     h += '<dt>用户姓名</dt><dd>' + esc(a.real_name || '—') + '</dd>';
     h += '<dt>年龄</dt><dd>' + (a.age != null ? esc(a.age) : '—') + '</dd>';
     h += '<dt>电话</dt><dd>' + esc(a.phone || '—') + '</dd>';
-    h += '<dt>银行账户</dt><dd>' + esc(a.bank_account || '—') + '</dd>';
+    var pch = (a.payout_channel === 'wechat') ? '微信支付' : (a.payout_channel === 'alipay' ? '支付宝' : '—');
+    h += '<dt>支付渠道</dt><dd>' + esc(pch) + '</dd>';
+    h += '<dt>支付账号</dt><dd>' + esc(a.payout_account || '—') + '</dd>';
+    h += '<dt>收款真实姓名</dt><dd>' + esc(a.payout_holder_name || '—') + '</dd>';
     h += '<dt>本月返点率</dt><dd>' + esc(a.current_rate) + '</dd>';
     h += '<dt>状态</dt><dd>' + esc(a.status) + '</dd>';
     h += '<dt>创建时间</dt><dd>' + esc(a.created_at || '—') + '</dd>';

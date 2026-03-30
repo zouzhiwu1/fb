@@ -23,7 +23,7 @@ class Agent(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     agent_code = db.Column(db.String(32), unique=True, nullable=False, index=True)
-    login_name = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    login_name = db.Column(db.String(128), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     display_name = db.Column(db.String(128), nullable=False, default="")
     # 档案（管理员开户时录入；历史数据可为空）
@@ -31,6 +31,9 @@ class Agent(db.Model):
     age = db.Column(db.Integer, nullable=True)
     phone = db.Column(db.String(20), nullable=True, unique=True, index=True)
     bank_account = db.Column(db.Text(), nullable=True)
+    payout_channel = db.Column(db.String(16), nullable=True)  # alipay | wechat
+    payout_account = db.Column(db.String(256), nullable=True)
+    payout_holder_name = db.Column(db.String(64), nullable=True)
     contact = db.Column(db.String(128), nullable=True)
     current_rate = db.Column(
         db.Numeric(6, 4), nullable=False, default=0
@@ -46,7 +49,7 @@ class Agent(db.Model):
 
 
 class AgentCommissionSettlement(db.Model):
-    """管理员结算佣金流水：操作者、代理商、结算属期、账户快照、金额与时间。"""
+    """管理员结算佣金流水：线下打款后在系统登记金额与支付凭证（渠道+订单号）。"""
 
     __tablename__ = "agent_commission_settlements"
 
@@ -64,7 +67,9 @@ class AgentCommissionSettlement(db.Model):
         index=True,
     )
     settlement_month = db.Column(db.String(7), nullable=True, index=True)
-    agent_bank_account = db.Column(db.Text(), nullable=True)
+    payment_channel = db.Column(db.String(16), nullable=True)  # alipay | wechat
+    payment_reference = db.Column(db.String(256), nullable=True)
+    payment_note = db.Column(db.Text(), nullable=True)
     amount_yuan = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 

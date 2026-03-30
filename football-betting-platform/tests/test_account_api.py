@@ -14,7 +14,7 @@ from app.models import User, VerificationCode
 def _add_user(
     *,
     phone: str,
-    password: str | None = "secret12",
+    password: str | None = "Secret12!",
     email: str | None = None,
     username: str | None = None,
     gender: str = "男",
@@ -44,7 +44,7 @@ def _auth(uid: int) -> dict:
 def user_with_password(platform_app):
     with platform_app.app_context():
         phone = f"138{secrets.randbelow(10**8):08d}"
-        uid = _add_user(phone=phone, password="oldpass12")
+        uid = _add_user(phone=phone, password="Oldpass12!")
         return uid, phone
 
 
@@ -65,7 +65,7 @@ def test_change_password_wrong_current(platform_client, user_with_password):
     uid, _ = user_with_password
     r = platform_client.post(
         "/api/auth/change-password",
-        json={"current_password": "wrong", "new_password": "newpass12"},
+        json={"current_password": "wrong", "new_password": "Newpass12!"},
         headers=_auth(uid),
     )
     assert r.status_code == 400
@@ -76,17 +76,17 @@ def test_change_password_success(platform_app, platform_client, user_with_passwo
     uid, phone = user_with_password
     r = platform_client.post(
         "/api/auth/change-password",
-        json={"current_password": "oldpass12", "new_password": "newpass99"},
+        json={"current_password": "Oldpass12!", "new_password": "Newpass99!"},
         headers=_auth(uid),
     )
     assert r.status_code == 200
     assert r.get_json()["ok"] is True
     with platform_app.app_context():
         u = db.session.get(User, uid)
-        assert check_password_hash(u.password_hash, "newpass99")
+        assert check_password_hash(u.password_hash, "Newpass99!")
     login = platform_client.post(
         "/api/auth/login",
-        json={"phone": phone, "password": "newpass99"},
+        json={"phone": phone, "password": "Newpass99!"},
     )
     assert login.status_code == 200
 
@@ -95,14 +95,14 @@ def test_change_password_first_time_no_current(platform_app, platform_client, us
     uid, phone = user_no_password
     r = platform_client.post(
         "/api/auth/change-password",
-        json={"new_password": "firstpass1"},
+        json={"new_password": "Firstpass1!"},
         headers=_auth(uid),
     )
     assert r.status_code == 200
     with platform_app.app_context():
         u = db.session.get(User, uid)
         assert u.password_hash
-        assert check_password_hash(u.password_hash, "firstpass1")
+        assert check_password_hash(u.password_hash, "Firstpass1!")
 
 
 def test_me_includes_password_set(platform_client, user_with_password):
@@ -138,7 +138,7 @@ def test_change_email_duplicate_other_user(platform_app, platform_client, user_w
     taken = f"taken_{secrets.token_hex(4)}@example.com"
     with platform_app.app_context():
         phone_b = f"136{secrets.randbelow(10**8):08d}"
-        _add_user(phone=phone_b, email=taken, password="x" * 10)
+        _add_user(phone=phone_b, email=taken, password="Aa1!xxxxxx")
 
     r = platform_client.post(
         "/api/auth/change-email",
@@ -191,7 +191,7 @@ def test_change_phone_taken(platform_app, platform_client, user_with_password):
     uid_a, phone_a = user_with_password
     with platform_app.app_context():
         phone_b = f"135{secrets.randbelow(10**8):08d}"
-        _add_user(phone=phone_b, password="x" * 10)
+        _add_user(phone=phone_b, password="Bb2!yyyyyy")
         rec = VerificationCode(
             phone=phone_b,
             code="888888",

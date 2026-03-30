@@ -45,7 +45,7 @@ def make_test_user_and_token(platform_app):
         phone = f"138{secrets.randbelow(10**8):08d}"
         u = User(
             phone=phone,
-            password_hash=generate_password_hash("test-pass-1"),
+            password_hash=generate_password_hash("TestPass1!"),
         )
         db.session.add(u)
         db.session.commit()

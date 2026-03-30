@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { changeEmail, changePassword, changePhone, sendSmsCode } from '@/api/auth';
+import { PASSWORD_POLICY_HINT, validatePasswordClient } from '@/lib/passwordPolicy';
 import { useAuth } from '@/context/AuthContext';
 import { UI } from '@/constants/ui';
 
@@ -42,8 +43,9 @@ export default function AccountScreen() {
 
   const doChangePassword = async () => {
     if (!token) return;
-    if (newPwd.length < 6) {
-      Alert.alert('提示', '新密码至少 6 位');
+    const pe = validatePasswordClient(newPwd);
+    if (pe) {
+      Alert.alert('提示', pe);
       return;
     }
     setBusy(true);
@@ -150,6 +152,7 @@ export default function AccountScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>修改密码</Text>
+          <Text style={styles.policyHint}>{PASSWORD_POLICY_HINT}</Text>
           {user?.password_set ? (
             <TextInput
               style={styles.input}
@@ -164,7 +167,7 @@ export default function AccountScreen() {
           )}
           <TextInput
             style={styles.input}
-            placeholder="新密码（≥6 位）"
+            placeholder="新密码"
             placeholderTextColor={UI.muted}
             secureTextEntry
             value={newPwd}
@@ -241,7 +244,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: UI.border,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: UI.text, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: UI.text, marginBottom: 8 },
+  policyHint: { fontSize: 11, color: UI.muted, marginBottom: 10, lineHeight: 16 },
   row: { fontSize: 14, color: UI.muted, marginBottom: 6 },
   note: { fontSize: 13, color: UI.muted, marginBottom: 10 },
   input: {

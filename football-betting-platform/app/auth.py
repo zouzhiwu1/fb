@@ -19,6 +19,7 @@ from config import (
     SMS_CODE_EXPIRE,
     SMS_SEND_INTERVAL,
 )
+from football_betting_common import validate_password_strength
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -140,8 +141,9 @@ def register():
         return jsonify({"ok": False, "message": "请输入用户名"}), 400
     if not gender:
         return jsonify({"ok": False, "message": "请选择性别"}), 400
-    if not password or len(password) < 6:
-        return jsonify({"ok": False, "message": "密码至少 6 位"}), 400
+    ok_pw, pw_msg = validate_password_strength(password)
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
     if not _is_valid_phone(phone):
         return jsonify({"ok": False, "message": "请输入 11 位有效手机号"}), 400
     if not email or "@" not in email:
@@ -299,8 +301,9 @@ def change_password():
     current_password = data.get("current_password") or ""
     new_password = (data.get("new_password") or "").strip()
 
-    if not new_password or len(new_password) < 6:
-        return jsonify({"ok": False, "message": "新密码至少 6 位"}), 400
+    ok_pw, pw_msg = validate_password_strength(new_password)
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
 
     if user.password_hash:
         if not current_password or not check_password_hash(user.password_hash, current_password):

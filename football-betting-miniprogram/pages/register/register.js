@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const { PASSWORD_POLICY_HINT, validatePasswordClient } = require('../../utils/passwordPolicy.js');
 
 Page({
   data: {
@@ -11,6 +12,7 @@ Page({
     loading: false,
     sending: false,
     cooldown: 0,
+    passwordPolicyHint: PASSWORD_POLICY_HINT,
   },
 
   timer: null,
@@ -97,8 +99,9 @@ Page({
       wx.showToast({ title: '请选择性别', icon: 'none' });
       return;
     }
-    if ((this.data.password || '').length < 6) {
-      wx.showToast({ title: '密码至少 6 位', icon: 'none' });
+    const pe = validatePasswordClient(this.data.password);
+    if (pe) {
+      wx.showToast({ title: pe, icon: 'none' });
       return;
     }
     if (!/^\d{11}$/.test((this.data.phone || '').trim())) {

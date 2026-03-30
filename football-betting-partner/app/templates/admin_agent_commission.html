@@ -28,13 +28,13 @@
   .ab-foot { margin-top: 20px; }
   .settle-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
   .settle-overlay.open { display: flex; }
-  .settle-modal { background: #fff; border-radius: 12px; padding: 22px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+  .settle-modal { background: #fff; border-radius: 12px; padding: 22px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
   .settle-modal h3 { margin: 0 0 14px; font-size: 1.1rem; color: #0f172a; }
   .settle-modal label { display: block; font-size: 13px; color: #64748b; margin-bottom: 6px; }
   .settle-modal .settle-meta { font-size: 13px; color: #334155; margin-bottom: 12px; line-height: 1.5; }
   .settle-modal .settle-meta strong { color: #0f172a; }
-  .settle-modal .settle-bank { white-space: pre-wrap; word-break: break-all; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 120px; overflow-y: auto; }
-  .settle-modal input[type="number"] { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+  .settle-modal input[type="number"], .settle-modal input[type="text"], .settle-modal select, .settle-modal textarea { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+  .settle-modal textarea { min-height: 64px; resize: vertical; }
   .settle-modal .row-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
   .settle-modal .row-btns button { padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; }
   .settle-modal .row-btns button.primary { background: #166534; color: #fff; border-color: #166534; }
@@ -44,7 +44,7 @@
 <h1>佣金</h1>
 <div class="ab-head">
   <p id="welcome" class="ab-welcome muted">加载中…</p>
-  <p class="muted" style="font-size:12px;margin-top:8px;">数据与代理商「明细看板」一致；线下打款给代理商后，在此登记本次结算金额。</p>
+  <p class="muted" style="font-size:12px;margin-top:8px;">数据与代理商「明细看板」一致；线下打款后在此登记金额，并填写支付渠道与账单订单号备查。</p>
 </div>
 
 <div class="ab-actions">
@@ -91,8 +91,16 @@
   <div class="settle-modal" role="dialog" aria-labelledby="settle_title">
     <h3 id="settle_title">结算佣金</h3>
     <p class="settle-meta"><strong>结算月份</strong>：<span id="settle_ym_display">—</span></p>
-    <p class="settle-meta"><strong>代理商银行账户</strong>（将写入结算记录）</p>
-    <div id="settle_bank_display" class="settle-bank muted">—</div>
+    <p class="settle-meta muted" style="font-size:12px;">请先在支付宝或微信完成转账，再从账单详情复制订单号填入下方。</p>
+    <label for="settle_channel">支付渠道</label>
+    <select id="settle_channel">
+      <option value="alipay">支付宝</option>
+      <option value="wechat">微信</option>
+    </select>
+    <label for="settle_reference">订单号（payment_reference）</label>
+    <input type="text" id="settle_reference" autocomplete="off" placeholder="账单中的交易单号 / 订单号">
+    <label for="settle_note">备注（选填）</label>
+    <textarea id="settle_note" placeholder="可选说明"></textarea>
     <label for="settle_amount">结算金额（元）</label>
     <input type="number" id="settle_amount" step="0.01" min="0.01" placeholder="例如 100.00">
     <div id="settle_msg" class="msg error" style="display:none;margin-top:10px;"></div>
@@ -202,7 +210,6 @@
   var overlay = document.getElementById('settle_overlay');
   var settleMsg = document.getElementById('settle_msg');
   var settleInput = document.getElementById('settle_amount');
-  var agentBankSnapshot = '';
 
   function openSettle() {
     var ym = document.getElementById('q_month').value;
@@ -212,8 +219,10 @@
     }
     settleMsg.style.display = 'none';
     settleInput.value = '';
+    document.getElementById('settle_channel').value = 'alipay';
+    document.getElementById('settle_reference').value = '';
+    document.getElementById('settle_note').value = '';
     document.getElementById('settle_ym_display').textContent = ym;
-    document.getElementById('settle_bank_display').textContent = agentBankSnapshot || '（档案中暂无，仍将保存为空）';
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     settleInput.focus();
@@ -243,11 +252,25 @@
       settleMsg.style.display = 'block';
       return;
     }
+    var pch = (document.getElementById('settle_channel').value || '').trim();
+    var pref = (document.getElementById('settle_reference').value || '').trim();
+    if (!pref) {
+      settleMsg.textContent = '请填写订单号';
+      settleMsg.style.display = 'block';
+      return;
+    }
+    var pnote = (document.getElementById('settle_note').value || '').trim();
     var url = partnerPath('/api/partner/admin/agents/' + agentId + '/commission/settle');
     fetch(url, {
       method: 'POST',
       headers: hdr,
-      body: JSON.stringify({ amount_yuan: raw, settlement_month: ymSettle })
+      body: JSON.stringify({
+        amount_yuan: raw,
+        settlement_month: ymSettle,
+        payment_channel: pch,
+        payment_reference: pref,
+        payment_note: pnote || undefined
+      })
     }).then(parseJson).then(function (j) {
       if (!j.ok) {
         if (j.message === '未登录' || j.message === '登录已失效') {
@@ -282,9 +305,6 @@
       var a = j.agent;
       document.getElementById('welcome').textContent =
         'ID ' + a.id + ' · ' + (a.real_name || a.display_name || a.login_name) + ' · 推广码 ' + a.agent_code + ' · 登录名 ' + a.login_name;
-      var ba = (a.bank_account || '').trim();
-      var bi = (a.bank_info || '').trim();
-      agentBankSnapshot = ba && bi ? (ba + '\n' + bi) : (ba || bi || '');
       setDefaultMonth();
       loadBoard();
     })

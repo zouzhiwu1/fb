@@ -2,8 +2,8 @@
 {% block title %}代理商登录{% endblock %}
 {% block content %}
 <h1>代理商登录</h1>
-<label for="login_name">登录名</label>
-<input id="login_name" type="text" autocomplete="username" placeholder="login_name">
+<label for="login_name">登录名（邮箱）</label>
+<input id="login_name" type="email" autocomplete="username" placeholder="name@example.com" maxlength="128">
 <label for="password">密码</label>
 <input id="password" type="password" autocomplete="current-password">
 <button type="button" class="primary" id="btn">登录</button>
@@ -28,7 +28,7 @@
   btn.addEventListener('click', function () {
     var login_name = document.getElementById('login_name').value.trim();
     var password = document.getElementById('password').value;
-    if (!login_name || !password) { showErr('请输入账号和密码'); return; }
+    if (!login_name || !password) { showErr('请输入邮箱和密码'); return; }
     btn.disabled = true;
     msg.style.display = 'none';
     fetch(partnerPath('/api/partner/auth/login'), {

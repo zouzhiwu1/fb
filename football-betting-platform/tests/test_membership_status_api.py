@@ -39,7 +39,7 @@ def test_membership_status_with_active_record(platform_app, platform_client):
         phone = f"138{secrets.randbelow(10**8):08d}"
         u = User(
             phone=phone,
-            password_hash=generate_password_hash("x" * 10),
+            password_hash=generate_password_hash("Aa1!xxxxxx"),
             username=f"m_{secrets.token_hex(4)}",
             gender="男",
             email=f"{secrets.token_hex(4)}@m.test",

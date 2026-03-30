@@ -53,11 +53,36 @@
       return { ok: r.ok, status: r.status, j: j };
     });
   }
+  function validateCnMobile(s) {
+    return /^1[3-9]\d{9}$/.test((s || '').trim());
+  }
+  function validateAgentLoginEmail(s) {
+    var t = (s || '').trim();
+    if (!t || t.length > 128 || /\s/.test(t)) return false;
+    if (t.indexOf('@') < 1 || t.lastIndexOf('@') !== t.indexOf('@')) return false;
+    var parts = t.split('@');
+    var local = parts[0], domain = parts[1];
+    if (!local || !domain || domain.indexOf('.') < 0) return false;
+    if (local.length > 64 || domain.length > 63) return false;
+    var tok = /^[a-zA-Z0-9._%+\-]+$/;
+    if (!tok.test(local)) return false;
+    return domain.split('.').every(function (p) { return p && tok.test(p); });
+  }
+  function validatePasswordPolicy(pw) {
+    var p = (pw || '').trim();
+    if (!p) return '请输入密码';
+    if (/\s/.test(p)) return '密码不能包含空格';
+    if (p.length < 8) return '密码至少 8 位';
+    if (!/[A-Za-z]/.test(p)) return '密码须包含英文字母';
+    if (!/\d/.test(p)) return '密码须包含数字';
+    if (!/[!@#$%^&*()_+\-=[\]{}|;:,.<>?/~`'"']/.test(p)) return '密码须包含符号';
+    return '';
+  }
   function mountForm(a) {
     var html = ''
       + '<input type="hidden" id="ed_agent_id" value="' + String(a.id) + '">'
-      + '<label for="ed_login_name">登录名</label>'
-      + '<input id="ed_login_name" type="text" autocomplete="off" value="">'
+      + '<label for="ed_login_name">登录名（邮箱）</label>'
+      + '<input id="ed_login_name" type="email" autocomplete="off" value="" maxlength="128">'
       + '<label for="ed_agent_code">推广码</label>'
       + '<input id="ed_agent_code" type="text" autocomplete="off" value="">'
       + '<p id="ed_agent_code_hint" class="muted code-hint" style="font-size:12px;margin-top:-8px;"></p>'
@@ -68,9 +93,16 @@
       + '<label for="ed_age">年龄</label>'
       + '<input id="ed_age" type="number" min="1" max="120" value="">'
       + '<label for="ed_phone">电话号码</label>'
-      + '<input id="ed_phone" type="tel" value="">'
-      + '<label for="ed_bank_account">银行账户</label>'
-      + '<textarea id="ed_bank_account"></textarea>'
+      + '<input id="ed_phone" type="tel" maxlength="11" value="">'
+      + '<label for="ed_payout_channel">支付渠道</label>'
+      + '<select id="ed_payout_channel">'
+      + '<option value="alipay">支付宝</option>'
+      + '<option value="wechat">微信支付</option>'
+      + '</select>'
+      + '<label for="ed_payout_account">支付账号</label>'
+      + '<input id="ed_payout_account" type="text" value="">'
+      + '<label for="ed_payout_holder_name">收款真实姓名</label>'
+      + '<input id="ed_payout_holder_name" type="text" value="">'
       + '<label for="ed_current_rate">本月返点率（小数）</label>'
       + '<input id="ed_current_rate" type="text" placeholder="如 0.08" value="">'
       + '<label for="ed_status">状态</label>'
@@ -79,6 +111,7 @@
       + '<option value="disabled">禁用 disabled</option>'
       + '</select>'
       + '<label for="ed_password">新登录密码</label>'
+      + '<p class="muted" style="font-size:12px;margin-top:-6px;">留空不修改。填写时须至少 8 位，含字母、数字、符号。</p>'
       + '<input id="ed_password" type="password" autocomplete="new-password" placeholder="不修改请留空；填写后将使该代理商已登录会话失效">'
       + '<button type="button" class="primary admin" id="ed_save">保存修改</button>'
       + '<button type="button" class="secondary" id="ed_cancel">取消（返回查看）</button>';
@@ -89,7 +122,9 @@
     document.getElementById('ed_real_name').value = a.real_name || '';
     document.getElementById('ed_age').value = a.age != null ? String(a.age) : '';
     document.getElementById('ed_phone').value = a.phone || '';
-    document.getElementById('ed_bank_account').value = a.bank_account || '';
+    document.getElementById('ed_payout_channel').value = (a.payout_channel === 'wechat') ? 'wechat' : 'alipay';
+    document.getElementById('ed_payout_account').value = a.payout_account || '';
+    document.getElementById('ed_payout_holder_name').value = a.payout_holder_name || '';
     document.getElementById('ed_current_rate').value = a.current_rate != null ? String(a.current_rate) : '';
     document.getElementById('ed_status').value = (a.status === 'disabled') ? 'disabled' : 'active';
     document.getElementById('ed_password').value = '';
@@ -136,19 +171,35 @@
     });
     document.getElementById('ed_save').addEventListener('click', function () {
       hideErr();
+      var ln = document.getElementById('ed_login_name').value.trim();
+      if (!validateAgentLoginEmail(ln)) { showErr('登录名须为有效邮箱地址'); return; }
+      var ph = document.getElementById('ed_phone').value.trim();
+      if (!validateCnMobile(ph)) { showErr('请输入 11 位中国大陆手机号'); return; }
+      var pch = document.getElementById('ed_payout_channel').value.trim();
+      if (pch !== 'alipay' && pch !== 'wechat') { showErr('请选择支付渠道'); return; }
+      var pacct = document.getElementById('ed_payout_account').value.trim();
+      if (!pacct) { showErr('请填写支付账号'); return; }
+      var pholder = document.getElementById('ed_payout_holder_name').value.trim();
+      if (!pholder) { showErr('请填写收款真实姓名'); return; }
       var body = {
-        login_name: document.getElementById('ed_login_name').value.trim(),
+        login_name: ln,
         agent_code: document.getElementById('ed_agent_code').value.trim(),
         display_name: document.getElementById('ed_display_name').value.trim(),
         real_name: document.getElementById('ed_real_name').value.trim(),
         age: document.getElementById('ed_age').value,
-        phone: document.getElementById('ed_phone').value.trim(),
-        bank_account: document.getElementById('ed_bank_account').value.trim(),
+        phone: ph,
+        payout_channel: pch,
+        payout_account: pacct,
+        payout_holder_name: pholder,
         current_rate: document.getElementById('ed_current_rate').value.trim(),
         status: document.getElementById('ed_status').value
       };
       var pw = document.getElementById('ed_password').value;
-      if (pw) body.password = pw;
+      if (pw) {
+        var perr = validatePasswordPolicy(pw);
+        if (perr) { showErr(perr); return; }
+        body.password = pw;
+      }
       if (body.current_rate === '') body.current_rate = 0;
       var btn = document.getElementById('ed_save');
       btn.disabled = true;

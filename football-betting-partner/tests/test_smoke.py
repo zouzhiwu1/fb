@@ -71,8 +71,8 @@ def test_monthly_board_ok_for_agent(client):
     client.post(
         "/api/partner/auth/bootstrap-agent",
         json={
-            "login_name": "dash_ag",
-            "password": "dash-pw",
+            "login_name": "dash_ag@test.local",
+            "password": "Dash1!dashpw",
             "agent_code": "DASH01",
             "display_name": "看板测",
         },
@@ -80,7 +80,7 @@ def test_monthly_board_ok_for_agent(client):
     )
     r1 = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "dash_ag", "password": "dash-pw"},
+        json={"login_name": "dash_ag@test.local", "password": "Dash1!dashpw"},
     )
     assert r1.status_code == 200
     token = r1.get_json()["token"]
@@ -107,7 +107,7 @@ def test_partner_put_me_profile_and_password(client):
     client.post(
         "/api/partner/auth/bootstrap-agent",
         json={
-            "login_name": "acc_ag",
+            "login_name": "acc_ag@test.local",
             "password": "orig-pw-12",
             "agent_code": "ACC01",
             "display_name": "账户测",
@@ -117,7 +117,7 @@ def test_partner_put_me_profile_and_password(client):
     )
     r1 = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "acc_ag", "password": "orig-pw-12"},
+        json={"login_name": "acc_ag@test.local", "password": "orig-pw-12"},
     )
     assert r1.status_code == 200
     tok = r1.get_json()["token"]
@@ -132,7 +132,7 @@ def test_partner_put_me_profile_and_password(client):
     client.post(
         "/api/partner/auth/bootstrap-agent",
         json={
-            "login_name": "acc_ag2",
+            "login_name": "acc_ag2@test.local",
             "password": "other-pw-12",
             "agent_code": "ACC02",
             "phone": "13600002222",
@@ -151,7 +151,9 @@ def test_partner_put_me_profile_and_password(client):
         json={
             "display_name": "新显示名",
             "real_name": "王五",
-            "bank_account": "招行 6222",
+            "payout_channel": "alipay",
+            "payout_account": "13600003333",
+            "payout_holder_name": "王五",
             "phone": "13600003333",
         },
         headers=hdr,
@@ -177,7 +179,7 @@ def test_partner_put_me_profile_and_password(client):
 
     r_login = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "acc_ag", "password": "changed-99"},
+        json={"login_name": "acc_ag@test.local", "password": "changed-99"},
     )
     assert r_login.status_code == 200
 
@@ -199,7 +201,7 @@ def test_partner_promo_links(client, monkeypatch):
     client.post(
         "/api/partner/auth/bootstrap-agent",
         json={
-            "login_name": "promo_ag",
+            "login_name": "promo_ag@test.local",
             "password": "promo-pw-99",
             "agent_code": "PROMO1",
             "display_name": "推广测",
@@ -208,7 +210,7 @@ def test_partner_promo_links(client, monkeypatch):
     )
     r1 = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "promo_ag", "password": "promo-pw-99"},
+        json={"login_name": "promo_ag@test.local", "password": "promo-pw-99"},
     )
     tok = r1.get_json()["token"]
     r2 = client.get(
@@ -266,25 +268,27 @@ def test_admin_agent_monthly_board_api(client, app):
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-admin",
-        json={"login_name": "adm_board", "password": "adm-pass-bd"},
+        json={"login_name": "adm_board", "password": "Adm1!passbd"},
         headers=h,
     )
     r1 = client.post(
         "/api/partner/auth/admin/login",
-        json={"login_name": "adm_board", "password": "adm-pass-bd"},
+        json={"login_name": "adm_board", "password": "Adm1!passbd"},
     )
     token = r1.get_json()["token"]
     auth = {"Authorization": f"Bearer {token}"}
     r2 = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "ag_board",
-            "password": "pw-bd",
+            "login_name": "ag_board@test.local",
+            "password": "Pw1!bdbdbd",
             "agent_code": "BD01",
             "real_name": "看板代查",
             "age": 30,
             "phone": "13611112222",
-            "bank_account": "测试",
+            "payout_channel": "alipay",
+            "payout_account": "13611112222",
+            "payout_holder_name": "看板代查",
         },
         headers={**auth, "Content-Type": "application/json"},
     )
@@ -310,7 +314,12 @@ def test_admin_agent_monthly_board_api(client, app):
 
     r5b = client.post(
         f"/api/partner/admin/agents/{aid}/commission/settle",
-        json={"amount_yuan": "1", "settlement_month": "2026-03"},
+        json={
+            "amount_yuan": "1",
+            "settlement_month": "2026-03",
+            "payment_channel": "alipay",
+            "payment_reference": "UNIT-R5B",
+        },
         headers={**auth, "Content-Type": "application/json"},
     )
     assert r5b.status_code == 400
@@ -322,7 +331,13 @@ def test_admin_agent_monthly_board_api(client, app):
     ):
         r6 = client.post(
             f"/api/partner/admin/agents/{aid}/commission/settle",
-            json={"amount_yuan": "88.5", "settlement_month": "2026-03"},
+            json={
+                "amount_yuan": "88.5",
+                "settlement_month": "2026-03",
+                "payment_channel": "alipay",
+                "payment_reference": "UNIT-TEST-ORDER-885",
+                "payment_note": "pytest settle",
+            },
             headers={**auth, "Content-Type": "application/json"},
         )
     assert r6.status_code == 200
@@ -342,7 +357,9 @@ def test_admin_agent_monthly_board_api(client, app):
         assert row.partner_admin_id == adm.id
         assert row.settlement_month == "2026-03"
         assert float(row.amount_yuan) == 88.5
-        assert (row.agent_bank_account or "") == "测试"
+        assert row.payment_channel == "alipay"
+        assert row.payment_reference == "UNIT-TEST-ORDER-885"
+        assert (row.payment_note or "") == "pytest settle"
 
     r7 = client.get(
         f"/api/partner/admin/agents/{aid}/monthly-board?month=2026-03",
@@ -356,7 +373,12 @@ def test_admin_agent_monthly_board_api(client, app):
     ):
         r8 = client.post(
             f"/api/partner/admin/agents/{aid}/commission/settle",
-            json={"amount_yuan": "20", "settlement_month": "2026-03"},
+            json={
+                "amount_yuan": "20",
+                "settlement_month": "2026-03",
+                "payment_channel": "wechat",
+                "payment_reference": "UNIT-R8",
+            },
             headers={**auth, "Content-Type": "application/json"},
         )
     assert r8.status_code == 400
@@ -382,13 +404,15 @@ def test_admin_register_agent_flow(client):
     r2 = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "ag1",
+            "login_name": "ag1@test.local",
             "password": "ag-pass-1",
             "agent_code": "T001",
             "real_name": "张三",
             "age": 30,
             "phone": "13800138000",
-            "bank_account": "工行 6222… 张三",
+            "payout_channel": "wechat",
+            "payout_account": "wx_zhangsan",
+            "payout_holder_name": "张三",
             "current_rate": 0.08,
         },
         headers=auth,
@@ -396,7 +420,7 @@ def test_admin_register_agent_flow(client):
     assert r2.status_code == 200 and r2.get_json()["ok"] is True
     r3 = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "ag1", "password": "ag-pass-1"},
+        json={"login_name": "ag1@test.local", "password": "ag-pass-1"},
     )
     assert r3.status_code == 200 and r3.get_json()["ok"] is True
 
@@ -405,25 +429,27 @@ def test_admin_agent_code_unique_case_insensitive(client):
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-admin",
-        json={"login_name": "adm_uq", "password": "adm-pass-uq"},
+        json={"login_name": "adm_uq", "password": "Adm1!passuq"},
         headers=h,
     )
     r1 = client.post(
         "/api/partner/auth/admin/login",
-        json={"login_name": "adm_uq", "password": "adm-pass-uq"},
+        json={"login_name": "adm_uq", "password": "Adm1!passuq"},
     )
     token = r1.get_json()["token"]
     auth = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     ok = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "uq_ag_a",
+            "login_name": "uq_ag_a@test.local",
             "password": "pw-uu-11",
             "agent_code": "UniqueCODE",
             "real_name": "甲",
             "age": 20,
             "phone": "13100000001",
-            "bank_account": "b1",
+            "payout_channel": "alipay",
+            "payout_account": "13100000001",
+            "payout_holder_name": "甲",
         },
         headers=auth,
     )
@@ -431,13 +457,15 @@ def test_admin_agent_code_unique_case_insensitive(client):
     r_dup = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "uq_ag_b",
+            "login_name": "uq_ag_b@test.local",
             "password": "pw-uu-22",
             "agent_code": "uniquecode",
             "real_name": "乙",
             "age": 21,
             "phone": "13100000002",
-            "bank_account": "b2",
+            "payout_channel": "alipay",
+            "payout_account": "13100000002",
+            "payout_holder_name": "乙",
         },
         headers=auth,
     )
@@ -449,12 +477,12 @@ def test_admin_check_agent_code_endpoint(client):
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-admin",
-        json={"login_name": "adm_ck", "password": "adm-pass-ck"},
+        json={"login_name": "adm_ck", "password": "Adm1!passck"},
         headers=h,
     )
     r1 = client.post(
         "/api/partner/auth/admin/login",
-        json={"login_name": "adm_ck", "password": "adm-pass-ck"},
+        json={"login_name": "adm_ck", "password": "Adm1!passck"},
     )
     token = r1.get_json()["token"]
     auth = {"Authorization": f"Bearer {token}"}
@@ -464,13 +492,15 @@ def test_admin_check_agent_code_endpoint(client):
     cr = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "ck_ag",
-            "password": "pw-ck",
+            "login_name": "ck_ag@test.local",
+            "password": "Pw1!ckagent",
             "agent_code": "CkCode99",
             "real_name": "丙",
             "age": 22,
             "phone": "13100000003",
-            "bank_account": "b3",
+            "payout_channel": "wechat",
+            "payout_account": "wx_ck",
+            "payout_holder_name": "丙",
         },
         headers=auth_json,
     )
@@ -512,28 +542,32 @@ def test_admin_get_put_agent(client):
     r2 = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "ag2",
-            "password": "pw2",
+            "login_name": "ag2@test.local",
+            "password": "Pw2!agtwoo",
             "agent_code": "T002",
             "real_name": "李四",
             "age": 40,
             "phone": "13900139000",
-            "bank_account": "建行",
+            "payout_channel": "alipay",
+            "payout_account": "13900139000",
+            "payout_holder_name": "李四",
         },
         headers=auth,
     )
     assert r2.status_code == 200
     aid = r2.get_json()["agent"]["id"]
     rg = client.get(f"/api/partner/admin/agents/{aid}", headers=auth)
-    assert rg.status_code == 200 and rg.get_json()["agent"]["login_name"] == "ag2"
+    assert rg.status_code == 200 and rg.get_json()["agent"]["login_name"] == "ag2@test.local"
     ru = client.put(
         f"/api/partner/admin/agents/{aid}",
         json={
             "real_name": "李四改",
             "age": 41,
             "phone": "13900139000",
-            "bank_account": "建行新卡",
-            "login_name": "ag2",
+            "payout_channel": "alipay",
+            "payout_account": "13900139000",
+            "payout_holder_name": "李四改",
+            "login_name": "ag2@test.local",
             "agent_code": "T002",
             "display_name": "李四改",
             "current_rate": 0.1,
@@ -545,13 +579,15 @@ def test_admin_get_put_agent(client):
     rp = client.put(
         f"/api/partner/admin/agents/{aid}",
         json={
-            "login_name": "ag2",
+            "login_name": "ag2@test.local",
             "agent_code": "T002",
             "real_name": "李四改",
             "age": 41,
             "phone": "13900139000",
-            "bank_account": "建行新卡",
-            "password": "new-secret-pw",
+            "payout_channel": "alipay",
+            "payout_account": "13900139000",
+            "payout_holder_name": "李四改",
+            "password": "New1!secretpw",
             "status": "disabled",
         },
         headers=auth,
@@ -559,7 +595,7 @@ def test_admin_get_put_agent(client):
     assert rp.status_code == 200
     r_login = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "ag2", "password": "new-secret-pw"},
+        json={"login_name": "ag2@test.local", "password": "New1!secretpw"},
     )
     assert r_login.status_code == 403
     client.put(
@@ -569,7 +605,7 @@ def test_admin_get_put_agent(client):
     )
     r_ok = client.post(
         "/api/partner/auth/login",
-        json={"login_name": "ag2", "password": "new-secret-pw"},
+        json={"login_name": "ag2@test.local", "password": "New1!secretpw"},
     )
     assert r_ok.status_code == 200 and r_ok.get_json().get("ok") is True
 
@@ -578,25 +614,27 @@ def test_admin_delete_agent_disabled(client):
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-admin",
-        json={"login_name": "adm_del", "password": "adm-pass-del"},
+        json={"login_name": "adm_del", "password": "Adm1!passdel"},
         headers=h,
     )
     r1 = client.post(
         "/api/partner/auth/admin/login",
-        json={"login_name": "adm_del", "password": "adm-pass-del"},
+        json={"login_name": "adm_del", "password": "Adm1!passdel"},
     )
     token = r1.get_json()["token"]
     auth = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     r2 = client.post(
         "/api/partner/admin/agents",
         json={
-            "login_name": "ag_del",
-            "password": "pw",
+            "login_name": "ag_del@test.local",
+            "password": "Pw1!delag01",
             "agent_code": "DEL01",
             "real_name": "保留",
             "age": 20,
             "phone": "13700000001",
-            "bank_account": "测试",
+            "payout_channel": "alipay",
+            "payout_account": "13700000001",
+            "payout_holder_name": "保留",
         },
         headers=auth,
     )

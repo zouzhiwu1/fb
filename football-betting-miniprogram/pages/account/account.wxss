@@ -27,6 +27,13 @@
   margin-bottom: 20rpx;
 }
 
+.hint {
+  font-size: 22rpx;
+  color: #9ca3af;
+  line-height: 1.45;
+  margin-bottom: 16rpx;
+}
+
 .ph {
   color: #6b7280;
 }

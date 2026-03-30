@@ -18,7 +18,7 @@
 .venv/bin/python scripts/init_database.py
 ```
 
-会按 `DATABASE_URL` 连接并执行 `scripts/init_full_stack.sql`（含 `users`、`payment_orders`、`agents`、`points_ledger` 等）。**会清空上述表的数据**，请勿在生产未备份时执行。
+会按 `DATABASE_URL` 连接并执行仓库根目录 **`scripts/init_database.sql`**（含 `users`、`payment_orders`、`agents`、`points_ledger` 等全库表）。**会清空上述表的数据**，请勿在生产未备份时执行。
 
 **仅需要 partner 表、且 `users` 表已由 platform 建好**时，可只执行：
 

@@ -33,7 +33,8 @@
   <label for="new_login">登录名</label>
   <input type="text" id="new_login" autocomplete="off" placeholder="例如 ops01">
   <div class="row-gap">
-    <label for="new_password">初始密码（至少 6 位）</label>
+    <label for="new_password">初始密码</label>
+    <p class="muted" style="font-size:12px;margin:0 0 8px;">至少 8 位，须含英文字母、数字和符号，不能含空格</p>
     <input type="password" id="new_password" autocomplete="new-password">
   </div>
   <button type="button" class="primary" id="btn_add">添加</button>
@@ -61,7 +62,8 @@
       </select>
     </div>
     <div class="row-gap">
-      <label for="edit_new_password">新密码（留空表示不修改，至少 6 位）</label>
+      <label for="edit_new_password">新密码（留空表示不修改）</label>
+      <p class="muted" style="font-size:12px;margin:0 0 8px;">填写时须至少 8 位，含字母、数字、符号，不能含空格</p>
       <input type="password" id="edit_new_password" autocomplete="new-password">
     </div>
     <div id="edit_msg" class="msg error" style="display:none;margin-top:10px;"></div>
@@ -95,6 +97,16 @@
   function esc(s) {
     if (s == null) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function validatePasswordPolicy(pw) {
+    var p = (pw || '').trim();
+    if (!p) return '请输入密码';
+    if (/\s/.test(p)) return '密码不能包含空格';
+    if (p.length < 8) return '密码至少 8 位';
+    if (!/[A-Za-z]/.test(p)) return '密码须包含英文字母';
+    if (!/\d/.test(p)) return '密码须包含数字';
+    if (!/[!@#$%^&*()_+\-=[\]{}|;:,.<>?/~`'"']/.test(p)) return '密码须包含符号';
+    return '';
   }
 
   function loadAdmins() {
@@ -183,7 +195,8 @@
     if (login_name.toLowerCase() === 'root') { em.textContent = '登录名不可为 root'; em.style.display = 'block'; return; }
     var body = { login_name: login_name, status: status };
     if (np.length) {
-      if (np.length < 6) { em.textContent = '新密码至少 6 位'; em.style.display = 'block'; return; }
+      var perr = validatePasswordPolicy(np);
+      if (perr) { em.textContent = perr; em.style.display = 'block'; return; }
       body.new_password = np;
     }
     fetch(partnerPath('/api/partner/admin/admins/' + id), {
@@ -212,6 +225,8 @@
     var login_name = document.getElementById('new_login').value.trim();
     var password = document.getElementById('new_password').value;
     if (!login_name || !password) { showErr('请填写登录名与密码'); return; }
+    var perr = validatePasswordPolicy(password);
+    if (perr) { showErr(perr); return; }
     if (login_name.toLowerCase() === 'root') { showErr('登录名不可为 root'); return; }
     fetch(partnerPath('/api/partner/admin/admins'), {
       method: 'POST',

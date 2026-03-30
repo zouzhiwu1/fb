@@ -7,11 +7,22 @@ from typing import Any, Optional, Tuple
 
 import jwt
 from flask import Blueprint, jsonify, request
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from football_betting_common import validate_password_strength
+
 import config as _cfg
 from app import db
+from app.contact_format import (
+    normalize_email,
+    validate_agent_login_email,
+    validate_cn_mobile,
+    validate_payout_account,
+    validate_payout_channel,
+    validate_payout_holder_name,
+)
 from app.models import Agent, PartnerAdmin
 
 partner_auth_bp = Blueprint("partner_auth", __name__)
@@ -191,11 +202,14 @@ def issue_root_token() -> str:
 @partner_auth_bp.route("/login", methods=["POST"])
 def partner_login():
     data = request.get_json(silent=True) or {}
-    login_name = (data.get("login_name") or "").strip()
+    login_name = normalize_email(data.get("login_name"))
     password = data.get("password") or ""
     if not login_name or not password:
         return jsonify({"ok": False, "message": "请输入账号和密码"}), 400
-    agent = Agent.query.filter_by(login_name=login_name).first()
+    ok_ln, ln_msg = validate_agent_login_email(login_name)
+    if not ok_ln:
+        return jsonify({"ok": False, "message": ln_msg}), 400
+    agent = Agent.query.filter(func.lower(Agent.login_name) == login_name).first()
     if not agent:
         return jsonify({"ok": False, "message": "账号或密码错误"}), 401
     if agent.status != "active":
@@ -309,6 +323,9 @@ def _agent_me_payload(agent: Agent) -> dict:
         "age": agent.age,
         "phone": agent.phone,
         "bank_account": agent.bank_account,
+        "payout_channel": agent.payout_channel,
+        "payout_account": agent.payout_account,
+        "payout_holder_name": agent.payout_holder_name,
         "contact": agent.contact,
         "current_rate": float(agent.current_rate or 0),
         "bank_info": agent.bank_info,
@@ -334,8 +351,9 @@ def partner_me():
         if not check_password_hash(agent.password_hash, cur):
             return jsonify({"ok": False, "message": "当前密码错误"}), 400
         np = str(new_pw_raw).strip()
-        if len(np) < 6:
-            return jsonify({"ok": False, "message": "新密码至少 6 位"}), 400
+        ok_pw, pw_msg = validate_password_strength(np)
+        if not ok_pw:
+            return jsonify({"ok": False, "message": pw_msg}), 400
         agent.password_hash = generate_password_hash(np)
         agent.session_version = int(agent.session_version or 1) + 1
         password_changed = True
@@ -358,19 +376,47 @@ def partner_me():
                 return jsonify({"ok": False, "message": "年龄应在 1～120 之间"}), 400
             agent.age = age
     if "phone" in data:
-        phone = (data.get("phone") or "").strip() or None
-        if phone:
-            other = Agent.query.filter(
-                Agent.phone == phone, Agent.id != agent.id
-            ).first()
-            if other:
-                return jsonify({"ok": False, "message": "该电话号码已被使用"}), 400
+        phone = (data.get("phone") or "").strip()
+        ok_ph, ph_msg = validate_cn_mobile(phone)
+        if not ok_ph:
+            return jsonify({"ok": False, "message": ph_msg}), 400
+        other = Agent.query.filter(Agent.phone == phone, Agent.id != agent.id).first()
+        if other:
+            return jsonify({"ok": False, "message": "该电话号码已被使用"}), 400
         agent.phone = phone
-        if phone:
-            agent.contact = phone
-    if "bank_account" in data:
-        v = (data.get("bank_account") or "").strip()
-        agent.bank_account = v if v else None
+        agent.contact = phone
+    if any(
+        k in data
+        for k in ("payout_channel", "payout_account", "payout_holder_name")
+    ):
+        pch = (
+            data["payout_channel"]
+            if "payout_channel" in data
+            else agent.payout_channel
+        )
+        pch = (pch or "").strip().lower()
+        pacct = (
+            data["payout_account"] if "payout_account" in data else agent.payout_account
+        )
+        pacct = (pacct or "").strip()
+        pho = (
+            data["payout_holder_name"]
+            if "payout_holder_name" in data
+            else agent.payout_holder_name
+        )
+        pho = (pho or "").strip()
+        ok_pc, pc_msg = validate_payout_channel(pch)
+        if not ok_pc:
+            return jsonify({"ok": False, "message": pc_msg}), 400
+        ok_pa, pa_msg = validate_payout_account(pacct)
+        if not ok_pa:
+            return jsonify({"ok": False, "message": pa_msg}), 400
+        ok_h, h_msg = validate_payout_holder_name(pho)
+        if not ok_h:
+            return jsonify({"ok": False, "message": h_msg}), 400
+        agent.payout_channel = pch
+        agent.payout_account = pacct
+        agent.payout_holder_name = pho
     if "contact" in data:
         v = (data.get("contact") or "").strip()
         agent.contact = v if v else None
@@ -400,19 +446,30 @@ def bootstrap_agent():
     if (request.headers.get("X-Partner-Bootstrap-Key") or "") != bk:
         return jsonify({"ok": False, "message": "forbidden"}), 403
     data = request.get_json(silent=True) or {}
-    login_name = (data.get("login_name") or "").strip()
+    login_name = normalize_email(data.get("login_name"))
     password = data.get("password") or ""
     agent_code = (data.get("agent_code") or "").strip()
     display_name = (data.get("display_name") or login_name).strip()
     if not login_name or not password or not agent_code:
         return jsonify({"ok": False, "message": "缺少 login_name/password/agent_code"}), 400
+    ok_ln, ln_msg = validate_agent_login_email(login_name)
+    if not ok_ln:
+        return jsonify({"ok": False, "message": ln_msg}), 400
+    ok_pw, pw_msg = validate_password_strength(str(password).strip())
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
     if Agent.query.filter(
-        (Agent.login_name == login_name) | (Agent.agent_code == agent_code)
+        (func.lower(Agent.login_name) == login_name) | (Agent.agent_code == agent_code)
     ).first():
         return jsonify({"ok": False, "message": "账号或推广码已存在"}), 400
-    phone = (data.get("phone") or "").strip() or None
-    if phone and Agent.query.filter_by(phone=phone).first():
-        return jsonify({"ok": False, "message": "该手机号已被使用"}), 400
+    phone_raw = (data.get("phone") or "").strip()
+    phone = phone_raw or None
+    if phone:
+        ok_ph, ph_msg = validate_cn_mobile(phone)
+        if not ok_ph:
+            return jsonify({"ok": False, "message": ph_msg}), 400
+        if Agent.query.filter_by(phone=phone).first():
+            return jsonify({"ok": False, "message": "该手机号已被使用"}), 400
     age = data.get("age")
     if age is not None and age != "":
         try:
@@ -421,6 +478,24 @@ def bootstrap_agent():
             return jsonify({"ok": False, "message": "年龄格式无效"}), 400
     else:
         age = None
+    pch = pacct = pho = None
+    if any(
+        data.get(k) not in (None, "")
+        for k in ("payout_channel", "payout_account", "payout_holder_name")
+    ):
+        pch = (data.get("payout_channel") or "").strip().lower()
+        pacct = (data.get("payout_account") or "").strip()
+        pho = (data.get("payout_holder_name") or "").strip()
+        ok_pc, pc_msg = validate_payout_channel(pch)
+        if not ok_pc:
+            return jsonify({"ok": False, "message": pc_msg}), 400
+        ok_pa, pa_msg = validate_payout_account(pacct)
+        if not ok_pa:
+            return jsonify({"ok": False, "message": pa_msg}), 400
+        ok_h, h_msg = validate_payout_holder_name(pho)
+        if not ok_h:
+            return jsonify({"ok": False, "message": h_msg}), 400
+
     agent = Agent(
         agent_code=agent_code,
         login_name=login_name,
@@ -429,7 +504,9 @@ def bootstrap_agent():
         real_name=(data.get("real_name") or "").strip() or None,
         age=age,
         phone=phone,
-        bank_account=(data.get("bank_account") or "").strip() or None,
+        payout_channel=pch,
+        payout_account=pacct,
+        payout_holder_name=pho,
         contact=phone or (data.get("contact") or "").strip() or None,
         current_rate=data.get("current_rate") or 0,
     )
@@ -450,6 +527,9 @@ def bootstrap_admin():
     password = data.get("password") or ""
     if not login_name or not password:
         return jsonify({"ok": False, "message": "缺少 login_name/password"}), 400
+    ok_pw, pw_msg = validate_password_strength(str(password).strip())
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
     if login_name.lower() == "root":
         return jsonify(
             {"ok": False, "message": "登录名 root 保留给部署根账号，请使用其它名称。"}

@@ -9,7 +9,8 @@
     <view class="chip {{gender === '其他' ? 'on' : ''}}" data-g="其他" bindtap="onGender">其他</view>
   </view>
 
-  <view class="label">密码（≥6 位）</view>
+  <view class="label">密码</view>
+  <view class="hint">{{passwordPolicyHint}}</view>
   <input class="input" password placeholder-class="ph" value="{{password}}" bindinput="onPassword" />
 
   <view class="label">手机号</view>

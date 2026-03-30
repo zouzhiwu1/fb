@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { register, sendSmsCode } from '@/api/auth';
+import { PASSWORD_POLICY_HINT, validatePasswordClient } from '@/lib/passwordPolicy';
 import { useAuth } from '@/context/AuthContext';
 import { UI } from '@/constants/ui';
 import { href } from '@/lib/href';
@@ -79,8 +80,9 @@ export default function RegisterScreen() {
       Alert.alert('提示', '请选择性别');
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('提示', '密码至少 6 位');
+    const pe = validatePasswordClient(password);
+    if (pe) {
+      Alert.alert('提示', pe);
       return;
     }
     if (!/^\d{11}$/.test(phone.trim())) {
@@ -152,7 +154,8 @@ export default function RegisterScreen() {
             ))}
           </View>
 
-          <Text style={styles.label}>密码（≥6 位）</Text>
+          <Text style={styles.label}>密码</Text>
+          <Text style={styles.hint}>{PASSWORD_POLICY_HINT}</Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -228,6 +231,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: 24, paddingBottom: 40 },
   label: { fontSize: 13, color: UI.text, marginBottom: 6, marginTop: 10 },
+  hint: { fontSize: 11, color: UI.muted, marginBottom: 4, lineHeight: 16 },
   input: {
     backgroundColor: UI.card,
     borderWidth: 1,

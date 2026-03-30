@@ -14,22 +14,32 @@
 <h1>注册代理商</h1>
 <p class="muted">填写档案与登录信息后提交开户；完成后可在一览中查看、修改。代理商不可删除。</p>
 <form id="reg_form">
-<h2 class="section">档案（佣金汇款）</h2>
+<h2 class="section">档案与联系</h2>
 <label for="real_name">用户姓名</label>
-<input id="real_name" name="real_name" type="text" autocomplete="name" placeholder="真实姓名" required>
+<input id="real_name" name="real_name" type="text" autocomplete="name" placeholder="档案姓名" required>
 <label for="age">年龄</label>
 <input id="age" name="age" type="number" min="1" max="120" placeholder="例如 35" required>
 <label for="phone">电话号码</label>
-<input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="11 位手机号" required>
-<label for="bank_account">银行账户</label>
-<textarea id="bank_account" name="bank_account" placeholder="开户名、开户行、卡号等，用于返还佣金汇款" required></textarea>
+<input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="11" placeholder="11 位中国大陆手机号" required pattern="1[3-9][0-9]{9}" title="请输入 11 位手机号，1 开头">
+<h2 class="section" style="font-size:1rem;color:#64748b;">线下收款信息（佣金打款核对）</h2>
+<p class="muted" style="font-size:12px;margin-top:-8px;">管理员线下转账时使用；须与支付宝/微信实名一致便于核对。</p>
+<label for="payout_channel">支付渠道</label>
+<select id="payout_channel" name="payout_channel" required>
+  <option value="">请选择</option>
+  <option value="alipay">支付宝</option>
+  <option value="wechat">微信支付</option>
+</select>
+<label for="payout_account">支付账号</label>
+<input id="payout_account" name="payout_account" type="text" autocomplete="off" placeholder="支付宝账号或微信绑定手机号等" required>
+<label for="payout_holder_name">收款真实姓名</label>
+<input id="payout_holder_name" name="payout_holder_name" type="text" autocomplete="name" placeholder="与收款账户实名一致" required>
 
 <h2 class="section" style="font-size:1rem;color:#64748b;">登录凭证与推广（密码必填）</h2>
-<label for="login_name">登录名</label>
-<input id="login_name" name="login_name" type="text" autocomplete="username" placeholder="代理商在「代理商登录」页填写的账号" required>
+<label for="login_name">登录名（邮箱）</label>
+<input id="login_name" name="login_name" type="email" autocomplete="username" placeholder="建议使用邮箱，如 name@example.com" required maxlength="128">
 <label for="password">登录密码（必填）</label>
-<input id="password" name="password" type="password" autocomplete="new-password" placeholder="与登录名一起用于代理商登录" required minlength="1">
-<p class="muted" style="margin-top:-8px;margin-bottom:12px;">不设密码则无法登录，请务必填写并告知代理商。</p>
+<input id="password" name="password" type="password" autocomplete="new-password" placeholder="字母+数字+符号，至少 8 位" required minlength="8">
+<p class="muted" style="margin-top:-8px;margin-bottom:12px;">至少 8 位，须含英文字母、数字和符号，不能含空格；不设密码则无法登录，请务必告知代理商。</p>
 <label for="agent_code">推广码</label>
 <input id="agent_code" name="agent_code" type="text" autocomplete="off" placeholder="全局唯一，如 D001（不区分大小写）" required>
 <p id="agent_code_hint" class="muted code-hint" style="font-size:12px;margin-top:-8px;margin-bottom:12px;min-height:18px;"></p>
@@ -60,7 +70,7 @@
       return '请检查 PARTNER_APPLICATION_PREFIX 是否与浏览器地址中的子路径一致。';
     }
     if (status === 500) {
-      return '多为数据库未迁移：请执行 scripts/migrate_partner_admin_and_agent_profile.sql。';
+      return '多为数据库未迁移：请执行 scripts/migrate_agent_payout_profile.sql。';
     }
     return '若使用子路径部署请检查 PARTNER_APPLICATION_PREFIX；否则查看服务日志。';
   }
@@ -72,6 +82,31 @@
       }
       return { ok: r.ok, status: r.status, j: j };
     });
+  }
+  function validateCnMobile(s) {
+    return /^1[3-9]\d{9}$/.test((s || '').trim());
+  }
+  function validateAgentLoginEmail(s) {
+    var t = (s || '').trim();
+    if (!t || t.length > 128 || /\s/.test(t)) return false;
+    if (t.indexOf('@') < 1 || t.lastIndexOf('@') !== t.indexOf('@')) return false;
+    var parts = t.split('@');
+    var local = parts[0], domain = parts[1];
+    if (!local || !domain || domain.indexOf('.') < 0) return false;
+    if (local.length > 64 || domain.length > 63) return false;
+    var tok = /^[a-zA-Z0-9._%+\-]+$/;
+    if (!tok.test(local)) return false;
+    return domain.split('.').every(function (p) { return p && tok.test(p); });
+  }
+  function validatePasswordPolicy(pw) {
+    var p = (pw || '').trim();
+    if (!p) return '请输入密码';
+    if (/\s/.test(p)) return '密码不能包含空格';
+    if (p.length < 8) return '密码至少 8 位';
+    if (!/[A-Za-z]/.test(p)) return '密码须包含英文字母';
+    if (!/\d/.test(p)) return '密码须包含数字';
+    if (!/[!@#$%^&*()_+\-=[\]{}|;:,.<>?/~`'"']/.test(p)) return '密码须包含符号';
+    return '';
   }
   var agentCodeTimer;
   function runAgentCodeCheck() {
@@ -122,12 +157,26 @@
       showErr('请填写登录密码，否则代理商无法用登录名登录系统。');
       return;
     }
+    var perr = validatePasswordPolicy(pwd);
+    if (perr) { showErr(perr); return; }
+    var phone = document.getElementById('phone').value.trim();
+    if (!validateCnMobile(phone)) { showErr('请输入 11 位中国大陆手机号（1 开头）'); return; }
+    var loginName = document.getElementById('login_name').value.trim();
+    if (!validateAgentLoginEmail(loginName)) { showErr('登录名须为有效邮箱地址'); return; }
+    var pch = document.getElementById('payout_channel').value.trim();
+    if (pch !== 'alipay' && pch !== 'wechat') { showErr('请选择支付渠道'); return; }
+    var pacct = document.getElementById('payout_account').value.trim();
+    if (!pacct) { showErr('请填写支付账号'); return; }
+    var pholder = document.getElementById('payout_holder_name').value.trim();
+    if (!pholder) { showErr('请填写收款真实姓名'); return; }
     var body = {
       real_name: document.getElementById('real_name').value.trim(),
       age: document.getElementById('age').value,
-      phone: document.getElementById('phone').value.trim(),
-      bank_account: document.getElementById('bank_account').value.trim(),
-      login_name: document.getElementById('login_name').value.trim(),
+      phone: phone,
+      payout_channel: pch,
+      payout_account: pacct,
+      payout_holder_name: pholder,
+      login_name: loginName,
       password: pwd,
       agent_code: document.getElementById('agent_code').value.trim(),
       current_rate: document.getElementById('current_rate').value.trim()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""读取项目根目录 .env 中的 DATABASE_URL，执行 init_full_stack.sql 初始化/重建库表。"""
+"""读取 partner/.env 中的 DATABASE_URL，执行仓库根 scripts/init_database.sql 初始化/重建库表。"""
 from __future__ import annotations
 
 import sys
@@ -40,11 +40,15 @@ def main() -> None:
     from config import DATABASE_URL
 
     kw = _parse_database_url(DATABASE_URL)
-    sql_path = Path(__file__).with_name("init_full_stack.sql")
+    repo_root = Path(__file__).resolve().parents[2]
+    sql_path = repo_root / "scripts" / "init_database.sql"
     if not sql_path.is_file():
-        raise SystemExit(f"未找到 {sql_path}")
+        raise SystemExit(f"未找到 {sql_path}（应在 monorepo 根目录 scripts/init_database.sql）")
 
-    sql = sql_path.read_text(encoding="utf-8")
+    raw_sql = sql_path.read_text(encoding="utf-8")
+    # 与 SQL 文件内可选的 -- USE 无关：连接虽带 database=，显式 USE 避免部分客户端/多语句边界问题
+    db = kw["database"].replace("`", "")
+    sql = f"USE `{db}`;\n{raw_sql}"
     conn = pymysql.connect(
         charset="utf8mb4",
         client_flag=CLIENT.MULTI_STATEMENTS,

@@ -9,10 +9,11 @@
 
   <view class="section card">
     <view class="section-title">修改密码</view>
+    <view class="hint">{{passwordPolicyHint}}</view>
     <view wx:if="{{user.password_set}}" class="note">已设置过密码需填写当前密码</view>
     <view wx:else class="note">当前账号未设置过密码，可直接设新密码</view>
     <input wx:if="{{user.password_set}}" class="input" password placeholder="当前密码" placeholder-class="ph" value="{{curPwd}}" bindinput="onCurPwd" />
-    <input class="input" password placeholder="新密码（≥6 位）" placeholder-class="ph" value="{{newPwd}}" bindinput="onNewPwd" />
+    <input class="input" password placeholder="新密码" placeholder-class="ph" value="{{newPwd}}" bindinput="onNewPwd" />
     <view class="btn-primary {{busy ? 'disabled' : ''}}" bindtap="doChangePassword">保存密码</view>
   </view>
 

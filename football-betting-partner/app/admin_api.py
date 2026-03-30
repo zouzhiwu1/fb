@@ -8,22 +8,32 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, OperationalError
 from werkzeug.security import generate_password_hash
 
+from football_betting_common import validate_password_strength
+
 from app import db
 from app.auth_partner import require_db_admin_token, require_root_only
+from app.contact_format import (
+    normalize_email,
+    validate_agent_login_email,
+    validate_cn_mobile,
+    validate_payout_account,
+    validate_payout_channel,
+    validate_payout_holder_name,
+)
 from app.dashboard import _parse_month_param, build_monthly_board_dict
 from app.models import Agent, AgentCommissionSettlement, PartnerAdmin
 
 partner_admin_bp = Blueprint("partner_admin_api", __name__, url_prefix="/api/partner/admin")
 
 _MIGRATE_MSG = (
-    "请先在 MySQL 执行 scripts/migrate_partner_admin_and_agent_profile.sql "
-    "（或完整 add_partner_tables.sql），确保 agents 表含 real_name、phone、bank_account 等字段。"
+    "请先在 MySQL 执行 scripts/migrate_agent_payout_profile.sql "
+    "（或完整 add_partner_tables.sql / init_database.sql），"
+    "确保 agents 表含 payout_channel、payout_account、payout_holder_name，且 login_name 可为 VARCHAR(128)。"
 )
 
 _SETTLE_MIGRATE_MSG = (
-    "请先在 MySQL 执行 scripts/add_agent_settled_commission.sql 与 "
-    "scripts/extend_commission_settlement_audit.sql，"
-    "确保 agent_commission_settlements 含 partner_admin_id、settlement_month、agent_bank_account。"
+    "请先在 MySQL 执行 scripts/extend_commission_settlement_payment.sql，"
+    "确保 agent_commission_settlements 含 payment_channel、payment_reference、payment_note。"
 )
 
 _SETTLEMENT_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -63,14 +73,6 @@ def _owed_paid_pending_commission_yuan(
     return owed, paid_dec, pending
 
 
-def _agent_bank_snapshot(agent: Agent) -> str:
-    a = (agent.bank_account or "").strip()
-    b = (agent.bank_info or "").strip()
-    if a and b:
-        return f"{a}\n{b}"
-    return a or b or ""
-
-
 def _agent_public_row(a: Agent) -> dict:
     return {
         "id": a.id,
@@ -82,6 +84,9 @@ def _agent_public_row(a: Agent) -> dict:
         "phone": a.phone,
         "bank_account": a.bank_account,
         "bank_info": a.bank_info,
+        "payout_channel": a.payout_channel,
+        "payout_account": a.payout_account,
+        "payout_holder_name": a.payout_holder_name,
         "current_rate": float(a.current_rate or 0),
         "status": a.status,
         "created_at": a.created_at.isoformat() if a.created_at else None,
@@ -127,8 +132,9 @@ def create_partner_admin():
             }
         ), 400
     np = str(password).strip()
-    if len(np) < 6:
-        return jsonify({"ok": False, "message": "密码至少 6 位"}), 400
+    ok_pw, pw_msg = validate_password_strength(np)
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
     if PartnerAdmin.query.filter_by(login_name=login_name).first():
         return jsonify({"ok": False, "message": "该登录名已存在"}), 400
     try:
@@ -188,8 +194,9 @@ def update_partner_admin(admin_id: int):
 
     np = str(data.get("new_password") or "").strip()
     if np:
-        if len(np) < 6:
-            return jsonify({"ok": False, "message": "新密码至少 6 位"}), 400
+        ok_pw, pw_msg = validate_password_strength(np)
+        if not ok_pw:
+            return jsonify({"ok": False, "message": pw_msg}), 400
         admin.password_hash = generate_password_hash(np)
         bump_sv = True
 
@@ -215,8 +222,9 @@ def reset_partner_admin_password(admin_id: int):
         return jsonify({"ok": False, "message": "管理员不存在"}), 404
     data = request.get_json(silent=True) or {}
     np = str(data.get("new_password") or "").strip()
-    if len(np) < 6:
-        return jsonify({"ok": False, "message": "新密码至少 6 位"}), 400
+    ok_pw, pw_msg = validate_password_strength(np)
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
     admin.password_hash = generate_password_hash(np)
     admin.session_version = int(admin.session_version or 1) + 1
     db.session.commit()
@@ -295,20 +303,38 @@ def create_agent():
     if err:
         return err
     data = request.get_json(silent=True) or {}
-    login_name = (data.get("login_name") or "").strip()
+    login_name = normalize_email(data.get("login_name"))
     password = data.get("password") or ""
     agent_code = (data.get("agent_code") or "").strip()
     real_name = (data.get("real_name") or "").strip()
     phone = (data.get("phone") or "").strip()
-    bank_account = (data.get("bank_account") or "").strip()
+    pch = (data.get("payout_channel") or "").strip().lower()
+    pacct = (data.get("payout_account") or "").strip()
+    pholder = (data.get("payout_holder_name") or "").strip()
     age_raw = data.get("age")
 
     if not login_name or not password or not agent_code:
         return jsonify({"ok": False, "message": "请填写登录名、初始密码、推广码"}), 400
-    if not real_name or not phone or not bank_account:
-        return jsonify(
-            {"ok": False, "message": "请填写用户姓名、电话号码、银行账户"}
-        ), 400
+    ok_ln, ln_msg = validate_agent_login_email(login_name)
+    if not ok_ln:
+        return jsonify({"ok": False, "message": ln_msg}), 400
+    ok_pw, pw_msg = validate_password_strength(str(password).strip())
+    if not ok_pw:
+        return jsonify({"ok": False, "message": pw_msg}), 400
+    ok_ph, ph_msg = validate_cn_mobile(phone)
+    if not ok_ph:
+        return jsonify({"ok": False, "message": ph_msg}), 400
+    if not real_name:
+        return jsonify({"ok": False, "message": "请填写用户姓名"}), 400
+    ok_pc, pc_msg = validate_payout_channel(pch)
+    if not ok_pc:
+        return jsonify({"ok": False, "message": pc_msg}), 400
+    ok_pa, pa_msg = validate_payout_account(pacct)
+    if not ok_pa:
+        return jsonify({"ok": False, "message": pa_msg}), 400
+    ok_h, h_msg = validate_payout_holder_name(pholder)
+    if not ok_h:
+        return jsonify({"ok": False, "message": h_msg}), 400
 
     try:
         age = int(age_raw)
@@ -325,7 +351,7 @@ def create_agent():
         return jsonify({"ok": False, "message": "返点率格式无效"}), 400
 
     try:
-        if Agent.query.filter_by(login_name=login_name).first():
+        if Agent.query.filter(func.lower(Agent.login_name) == login_name).first():
             return jsonify({"ok": False, "message": "该登录名已存在"}), 400
         if _agent_code_taken(agent_code, None):
             return jsonify(
@@ -345,7 +371,9 @@ def create_agent():
             real_name=real_name,
             age=age,
             phone=phone,
-            bank_account=bank_account,
+            payout_channel=pch,
+            payout_account=pacct,
+            payout_holder_name=pholder,
             contact=phone,
             current_rate=current_rate,
         )
@@ -396,6 +424,23 @@ def settle_agent_commission(agent_id: int):
     if amt <= 0:
         return jsonify({"ok": False, "message": "结算金额须大于 0"}), 400
 
+    ch = (data.get("payment_channel") or "").strip().lower()
+    if ch not in ("alipay", "wechat"):
+        return jsonify(
+            {
+                "ok": False,
+                "message": "请提供有效支付渠道 payment_channel：alipay 或 wechat",
+            }
+        ), 400
+    ref = (data.get("payment_reference") or "").strip()
+    if not ref:
+        return jsonify(
+            {"ok": False, "message": "请填写线下打款订单号 payment_reference"}
+        ), 400
+    if len(ref) > 256:
+        return jsonify({"ok": False, "message": "订单号过长（最多 256 字符）"}), 400
+    note = (data.get("payment_note") or "").strip() or None
+
     try:
         owed, paid_dec, pending = _owed_paid_pending_commission_yuan(agent, ym)
     except Exception:
@@ -416,8 +461,6 @@ def settle_agent_commission(agent_id: int):
             }
         ), 400
 
-    bank_snap = _agent_bank_snapshot(agent)
-
     try:
         prev = Decimal(str(agent.settled_commission_yuan or 0)).quantize(
             Decimal("0.01")
@@ -428,7 +471,9 @@ def settle_agent_commission(agent_id: int):
             partner_admin_id=admin.id,
             agent_id=agent_id,
             settlement_month=ym,
-            agent_bank_account=bank_snap or None,
+            payment_channel=ch,
+            payment_reference=ref,
+            payment_note=note,
             amount_yuan=amt,
         )
         db.session.add(row)
@@ -440,6 +485,8 @@ def settle_agent_commission(agent_id: int):
                 "amount_yuan": float(amt),
                 "settlement_id": row.id,
                 "settlement_month": ym,
+                "payment_channel": ch,
+                "payment_reference": ref,
             }
         )
     except OperationalError:
@@ -499,11 +546,12 @@ def update_agent(agent_id: int):
 
     try:
         if "login_name" in data:
-            login_name = (data.get("login_name") or "").strip()
-            if not login_name:
-                return jsonify({"ok": False, "message": "登录名不能为空"}), 400
+            login_name = normalize_email(data.get("login_name"))
+            ok_ln, ln_msg = validate_agent_login_email(login_name)
+            if not ok_ln:
+                return jsonify({"ok": False, "message": ln_msg}), 400
             other = Agent.query.filter(
-                Agent.login_name == login_name, Agent.id != agent_id
+                func.lower(Agent.login_name) == login_name, Agent.id != agent_id
             ).first()
             if other:
                 return jsonify({"ok": False, "message": "该登录名已被使用"}), 400
@@ -524,8 +572,9 @@ def update_agent(agent_id: int):
 
         if "phone" in data:
             phone = (data.get("phone") or "").strip()
-            if not phone:
-                return jsonify({"ok": False, "message": "电话号码不能为空"}), 400
+            ok_ph, ph_msg = validate_cn_mobile(phone)
+            if not ok_ph:
+                return jsonify({"ok": False, "message": ph_msg}), 400
             other = Agent.query.filter(Agent.phone == phone, Agent.id != agent_id).first()
             if other:
                 return jsonify({"ok": False, "message": "该电话号码已被使用"}), 400
@@ -540,11 +589,40 @@ def update_agent(agent_id: int):
             v = (data.get("display_name") or "").strip()
             agent.display_name = v or agent.display_name or ""
 
-        if "bank_account" in data:
-            v = (data.get("bank_account") or "").strip()
-            if not v:
-                return jsonify({"ok": False, "message": "银行账户不能为空"}), 400
-            agent.bank_account = v
+        if any(
+            k in data
+            for k in ("payout_channel", "payout_account", "payout_holder_name")
+        ):
+            pch = (
+                data["payout_channel"]
+                if "payout_channel" in data
+                else agent.payout_channel
+            )
+            pch = (pch or "").strip().lower()
+            pacct = (
+                data["payout_account"]
+                if "payout_account" in data
+                else agent.payout_account
+            )
+            pacct = (pacct or "").strip()
+            pho = (
+                data["payout_holder_name"]
+                if "payout_holder_name" in data
+                else agent.payout_holder_name
+            )
+            pho = (pho or "").strip()
+            ok_pc, pc_msg = validate_payout_channel(pch)
+            if not ok_pc:
+                return jsonify({"ok": False, "message": pc_msg}), 400
+            ok_pa, pa_msg = validate_payout_account(pacct)
+            if not ok_pa:
+                return jsonify({"ok": False, "message": pa_msg}), 400
+            ok_h, h_msg = validate_payout_holder_name(pho)
+            if not ok_h:
+                return jsonify({"ok": False, "message": h_msg}), 400
+            agent.payout_channel = pch
+            agent.payout_account = pacct
+            agent.payout_holder_name = pho
 
         if "age" in data:
             try:
@@ -572,7 +650,11 @@ def update_agent(agent_id: int):
 
         pwd = data.get("password")
         if pwd is not None and str(pwd).strip() != "":
-            agent.password_hash = generate_password_hash(str(pwd).strip())
+            pws = str(pwd).strip()
+            ok_pw, pw_msg = validate_password_strength(pws)
+            if not ok_pw:
+                return jsonify({"ok": False, "message": pw_msg}), 400
+            agent.password_hash = generate_password_hash(pws)
             agent.session_version = int(agent.session_version or 1) + 1
 
         db.session.commit()

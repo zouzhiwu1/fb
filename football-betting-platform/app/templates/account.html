@@ -33,14 +33,15 @@
   </div>
 
   <h2>修改密码</h2>
+  <p class="hint">至少 8 位，须含英文字母、数字和符号（如 ! # $ - _），不能含空格</p>
   <form id="form-password">
     <label for="current_password">当前密码</label>
     <input type="password" id="current_password" name="current_password" placeholder="若从未设置过密码可留空" autocomplete="current-password">
     <p class="hint" id="hint-no-password" style="display:none;">当前账号尚未设置密码，只需填写新密码即可。</p>
     <label for="new_password">新密码</label>
-    <input type="password" id="new_password" name="new_password" placeholder="至少 6 位" minlength="6" required autocomplete="new-password">
+    <input type="password" id="new_password" name="new_password" placeholder="字母+数字+符号" minlength="8" required autocomplete="new-password">
     <label for="new_password2">确认新密码</label>
-    <input type="password" id="new_password2" name="new_password2" placeholder="再次输入新密码" minlength="6" required autocomplete="new-password">
+    <input type="password" id="new_password2" name="new_password2" placeholder="再次输入新密码" minlength="8" required autocomplete="new-password">
     <button type="submit" class="primary" id="btn-password">保存密码</button>
   </form>
   <div id="msg-password" class="msg section-msg" style="display:none;"></div>
@@ -83,6 +84,17 @@
     el.style.display = 'block';
   }
   function hide(id) { var el = document.getElementById(id); el.style.display = 'none'; el.textContent = ''; }
+
+  function validatePasswordPolicy(pw) {
+    var p = (pw || '').trim();
+    if (!p) return '请输入新密码';
+    if (/\s/.test(p)) return '密码不能包含空格';
+    if (p.length < 8) return '密码至少 8 位';
+    if (!/[A-Za-z]/.test(p)) return '密码须包含英文字母';
+    if (!/\d/.test(p)) return '密码须包含数字';
+    if (!/[!@#$%^&*()_+\-=[\]{}|;:,.<>?/~`'"']/.test(p)) return '密码须包含符号';
+    return '';
+  }
 
   function fmtDate(iso) {
     if (!iso) return '—';
@@ -139,7 +151,8 @@
     var cur = document.getElementById('current_password').value;
     var n1 = document.getElementById('new_password').value;
     var n2 = document.getElementById('new_password2').value;
-    if (n1.length < 6) { show('msg-password', '新密码至少 6 位', true); return; }
+    var pe = validatePasswordPolicy(n1);
+    if (pe) { show('msg-password', pe, true); return; }
     if (n1 !== n2) { show('msg-password', '两次输入的新密码不一致', true); return; }
     var body = { new_password: n1 };
     if (cur) body.current_password = cur;

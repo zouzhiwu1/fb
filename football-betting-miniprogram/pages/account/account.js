@@ -1,10 +1,12 @@
 const api = require('../../utils/api.js');
+const { PASSWORD_POLICY_HINT, validatePasswordClient } = require('../../utils/passwordPolicy.js');
 
 Page({
   data: {
     user: {},
     curPwd: '',
     newPwd: '',
+    passwordPolicyHint: PASSWORD_POLICY_HINT,
     email: '',
     newPhone: '',
     phoneCode: '',
@@ -68,8 +70,9 @@ Page({
   doChangePassword() {
     const token = api.getToken();
     if (!token) return;
-    if ((this.data.newPwd || '').length < 6) {
-      wx.showToast({ title: '新密码至少 6 位', icon: 'none' });
+    const pe = validatePasswordClient(this.data.newPwd);
+    if (pe) {
+      wx.showToast({ title: pe, icon: 'none' });
       return;
     }
     this.setData({ busy: true });

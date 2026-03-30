@@ -6,20 +6,20 @@
 -- partner_admins 与 agents 可分两格执行：先 CREATE，再 ALTER。
 
 CREATE TABLE IF NOT EXISTS partner_admins (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  login_name VARCHAR(64) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  status VARCHAR(16) NOT NULL DEFAULT 'active',
-  session_version INT NOT NULL DEFAULT 1,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
+  login_name VARCHAR(64) NOT NULL COMMENT '管理员登录名，唯一',
+  password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
+  status VARCHAR(16) NOT NULL DEFAULT 'active' COMMENT '状态：active/disabled',
+  session_version INT NOT NULL DEFAULT 1 COMMENT '登录会话版本号：每次登录自增，旧 token 失效',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   UNIQUE KEY uq_partner_admins_login (login_name),
   KEY ix_partner_admins_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='合作方管理员';
 
 ALTER TABLE agents
-  ADD COLUMN real_name VARCHAR(64) NULL,
-  ADD COLUMN age INT NULL,
-  ADD COLUMN phone VARCHAR(20) NULL;
+  ADD COLUMN real_name VARCHAR(64) NULL COMMENT '真实姓名',
+  ADD COLUMN age INT NULL COMMENT '年龄',
+  ADD COLUMN phone VARCHAR(20) NULL COMMENT '联系电话';
 
 -- 若 agents 尚无 bank_account 再单独执行（一行即可）：
 -- ALTER TABLE agents ADD COLUMN bank_account TEXT NULL;

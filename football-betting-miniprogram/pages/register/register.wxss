@@ -4,6 +4,19 @@
   box-sizing: border-box;
 }
 
+.label {
+  font-size: 28rpx;
+  color: #e5e7eb;
+  margin: 24rpx 0 12rpx;
+}
+
+.hint {
+  font-size: 22rpx;
+  color: #9ca3af;
+  line-height: 1.45;
+  margin-bottom: 12rpx;
+}
+
 .ph {
   color: #6b7280;
 }
