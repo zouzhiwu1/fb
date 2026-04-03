@@ -208,7 +208,7 @@ def main():
       python crawl_real.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
 
     说明：
-    - 目前 crawl_real.py 实际仍按「执行当下的实时盘口」抓取，不依赖传入时间点，
+    - 目前 crawl_real.py 实际仍按「执行当下的shishipankou」抓取，不依赖传入时间点，
       这里的起始/终止时间主要用于与 merge_data.py 等脚本保持一致的调用方式，
       便于 run_real.py 统一管理参数，避免混淆。
     """

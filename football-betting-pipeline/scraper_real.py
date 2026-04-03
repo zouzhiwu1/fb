@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-智云比分网 竞足/北单/14场 比赛列表爬虫。
+智云比分网 竞足/beidan/14场 比赛列表爬虫。
 逻辑与 Java 版 ZhiyunScraperService 一致。
 
 下载方式：
-- 使用 Selenium 进入「足球 → 即时比分 → 足彩 → 北单」，等待表格刷新；
+- 使用 Selenium 进入「足球 → 即时比分 → zucai → beidan」，等待表格刷新；
 - 按 config：可视过滤 MATCH_FILTER_VISIBLE_ONLY、状态过滤 MATCH_STATUS_MODES、联赛白名单 TARGET_LEAGUE_NAMES；
 - 对每场状态为空的比赛，点击行内的「欧」链接，打开详情页；
 - 在详情页中点击「导出Excel」按钮，由浏览器下载 .xls；
@@ -84,7 +84,7 @@ class ZhiyunScraper:
             pass
 
     def run(self):
-        """主流程：打开页面 -> 足球 -> 即时比分 -> 足彩 -> 北单，等待表格刷新后仅处理状态为空的比赛，逐场导出并下载 Excel。"""
+        """主流程：打开页面 -> 足球 -> 即时比分 -> zucai -> beidan，等待表格刷新后仅处理状态为空的比赛，逐场导出并下载 Excel。"""
         now = _now_in_tz()
         self._run_time_suffix = now.strftime("%Y%m%d%H")
         log = logging.getLogger("crawl_real")
@@ -100,13 +100,13 @@ class ZhiyunScraper:
         live_tab = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "即时比分")))
         self._scroll_into_view_and_click(live_tab)
 
-        # 3) 对 竞足、北单、14场 分别处理（当前配置里只保留了「北单」）
+        # 3) 对 竞足、beidan、14场 分别处理（当前配置里只保留了「beidan」）
         for menu_option in ZUCAI_MENU_OPTIONS:
             log.info("========== 获取 [%s] 比赛列表 ==========", menu_option)
             first_row_home_before = self._get_first_data_row_home_team()
             self._hover_zucai_then_click_option(wait, menu_option)
             self._ensure_zucai_mode(menu_option)
-            # 以「首行主队是否变化」判断已切到当前足彩类型（北单等列表常远超 150 行，旧逻辑用行数≤150 会误报）
+            # 以「首行主队是否变化」判断已切到当前zucai类型（beidan等列表常远超 150 行，旧逻辑用行数≤150 会误报）
             self._wait_until_first_row_changed(first_row_home_before)
 
             if not self._ensure_valid_window():
@@ -203,7 +203,7 @@ class ZhiyunScraper:
             log.info("")
 
     def _hover_zucai_then_click_option(self, wait, option_text):
-        """鼠标移到「足彩」弹出菜单，再点击指定项（竞足/北单/14场）。"""
+        """鼠标移到「zucai」弹出菜单，再点击指定项（jingzu/beidan/14chang）。"""
         zucai_btn = wait.until(EC.presence_of_element_located((By.LINK_TEXT, "足彩")))
         ActionChains(self.driver).move_to_element(zucai_btn).perform()
 
@@ -223,7 +223,7 @@ class ZhiyunScraper:
         self._scroll_into_view_and_click(to_click)
 
     def _ensure_zucai_mode(self, menu_option):
-        """若页面有 SetLevel，直接调用以切换到竞足(3)/北单(2)/14场(1)。"""
+        """若页面有 SetLevel，直接调用以切换到jingzu(3)/beidan(2)/14chang(1)。"""
         level = 3 if menu_option == "竞足" else (2 if menu_option == "北单" else 1)
         try:
             ok = self.driver.execute_script(

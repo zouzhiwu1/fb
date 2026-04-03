@@ -129,10 +129,10 @@ else:
         kw.strip() for kw in _DEFAULT_TEAM_WHITELIST_KEYWORDS.split(",") if kw.strip()
     ]
 
-# 足彩子菜单：目前只抓取「北单」
+# zucai子菜单：目前只抓取「beidan」
 ZUCAI_MENU_OPTIONS = ["北单"]
 
-# 联赛白名单：北单「即时比分」「完场比分」主表仅抓取下列联赛（单元格简称与名单匹配，见 league_whitelist.py）。
+# 联赛白名单：beidan「即时比分」「完场比分」主表仅抓取下列联赛（单元格简称与名单匹配，见 league_whitelist.py）。
 # 可通过环境变量 CRAWLER_TARGET_LEAGUES 覆盖（英文逗号分隔）；设为空字符串表示关闭联赛白名单（不限制）。
 _DEFAULT_TARGET_LEAGUES = (
     "澳超,罗甲,波兰超,奥甲,奥乙,意甲,意乙,德甲,德乙,法甲,法乙,英超,英冠,英甲,英乙,"
