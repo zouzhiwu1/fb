@@ -194,4 +194,4 @@ WAIT_FIRST_ROW_CHANGED = 12
 # 单场「导出 Excel」未检测到新文件时的最大重试次数（仅重试点击导出，不含整页重新导航）
 EXPORT_EXCEL_MAX_ATTEMPTS = int(os.environ.get("CRAWLER_EXPORT_EXCEL_MAX_ATTEMPTS", "3"))
 # 每次点击导出后，在下载目录内等待新 .xls 的最长时间（秒）
-EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS = 10.0
+EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS = 3.0

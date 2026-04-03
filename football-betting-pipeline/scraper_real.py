@@ -505,8 +505,8 @@ class ZhiyunScraper:
             # 但实际运行中返回了站内 404 页面（虽然 HTTP 状态码为 200），导致保存的 xls 无法打开。
             # 为保证数据正确性，这里暂时停用该优化，统一回退到浏览器点击「导出Excel」的稳定方案。
 
-            # 详情页（含跳转 1x2）就绪后暂停 5 秒，便于观察页面再查找/点击「导出Excel」
-            time.sleep(5)
+            # 详情页（含跳转 1x2）就绪后暂停 2 秒，便于观察页面再查找/点击「导出Excel」
+            time.sleep(2)
 
             wait_export = WebDriverWait(self.driver, 5)
             # 导出按钮：优先用页面实际 id（debug HTML 中为 id="downobj"）
