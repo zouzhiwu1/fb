@@ -195,15 +195,36 @@ class ZhiyunScraper:
             else:
                 log.info("【荐过滤】当前设置：未启用（CRAWLER_MATCH_REQUIRE_JIAN=0）")
             log.info("--- 主队 vs 客队（将依次尝试导出）---")
+            export_fail_count = 0
+            last_index = 0
             for i, row in enumerate(match_rows, 1):
-                home = self._get_cell_text(row, COL_HOME)
-                away = self._get_cell_text(row, COL_AWAY)
-
-                log.info("%d. %s vs %s", i, home, away)
-                self._download_excel_for_row(wait, row, i, home, away, time_suffix=self._run_time_suffix)
+                last_index = i
+                home = ""
+                away = ""
+                try:
+                    home = self._get_cell_text(row, COL_HOME)
+                    away = self._get_cell_text(row, COL_AWAY)
+                    log.info("%d. %s vs %s", i, home, away)
+                    self._download_excel_for_row(
+                        wait, row, i, home, away, time_suffix=self._run_time_suffix
+                    )
+                except Exception:
+                    export_fail_count += 1
+                    log.exception(
+                        "第 %d 场导出失败（%s vs %s），已跳过并继续下一场",
+                        i,
+                        home or "?",
+                        away or "?",
+                    )
                 if DEBUG_MAX_MATCHES and i >= DEBUG_MAX_MATCHES:
                     log.info("[调试] 已抓取 %d 场，结束抓取。", DEBUG_MAX_MATCHES)
                     break
+            if last_index:
+                log.info(
+                    "本轮顺序导出结束：处理至第 %d 场，其中异常失败 %d 场（其余已继续）",
+                    last_index,
+                    export_fail_count,
+                )
             log.info("")
 
     def _hover_zucai_then_click_option(self, wait, option_text):
