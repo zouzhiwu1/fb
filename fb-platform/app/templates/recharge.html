@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}会员充值 - 绿茵战术前瞻{% endblock %}
+{% block container_class %} wide{% endblock %}
+{% block extra_css %}
+<style>
+  h1 { text-align: left; }
+  .recharge-main { max-width: 560px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 12px 0; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+  .nav-links { margin-bottom: 20px; font-size: 14px; }
+  .nav-links a { color: #2563eb; text-decoration: none; margin-right: 14px; }
+  .nav-links a:hover { text-decoration: underline; }
+  .option-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .option-card {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; background: #fff;
+  }
+  .option-card:hover { border-color: #93c5fd; }
+  .option-card.selected { border-color: #2563eb; background: #eff6ff; }
+  .option-card input { width: 18px; height: 18px; }
+  .option-card .meta { flex: 1; }
+  .option-card .name { font-weight: 600; color: #1e293b; }
+  .option-card .price { font-size: 1.1rem; color: #2563eb; font-weight: 700; }
+  .order-box {
+    margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 10px;
+    border: 1px solid #e2e8f0; font-size: 14px;
+  }
+  .order-box dt { color: #64748b; margin-top: 10px; }
+  .order-box dt:first-child { margin-top: 0; }
+  .order-box dd { margin: 4px 0 0 0; color: #1e293b; word-break: break-all; }
+  .mono { font-family: ui-monospace, monospace; font-size: 13px; }
+  .mock-block {
+    margin-top: 14px; padding: 12px; background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 8px; font-size: 13px; color: #78350f;
+  }
+  .mock-block code { display: block; margin-top: 8px; padding: 10px; background: #1e293b;
+    color: #e2e8f0; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .section-msg { margin-top: 12px; }
+</style>
+{% endblock %}
+{% block content %}
+  <div class="nav-links">
+    <a href="/home">首页</a>
+    <a href="/membership">会员信息</a>
+    <a href="/recharge-records">充值信息</a>
+    <a href="/account">账户资料</a>
+    <a href="/curves">曲线图</a>
+    <a href="/login" id="logout-nav">退出登录</a>
+  </div>
+  <h1>会员充值</h1>
+  <div class="recharge-main">
+  <p class="hint">选择会员档位后创建订单。支付成功后将通过系统回调自动开通会员（与支付宝 / 微信对接说明见 README）。</p>
+
+  <h2>选择档位</h2>
+  <div id="options-loading" class="hint">加载价格…</div>
+  <div id="options-area" style="display:none;"></div>
+  <button type="button" class="primary" id="btn-create" disabled>创建订单</button>
+  <div id="msg" class="msg section-msg" style="display:none;"></div>
+
+  <div id="order-result" style="display:none;">
+    <h2>订单已创建</h2>
+    <dl class="order-box">
+      <dt>商户订单号</dt>
+      <dd class="mono" id="r-out-no"></dd>
+      <dt>商品</dt>
+      <dd id="r-subject"></dd>
+      <dt>金额（元）</dt>
+      <dd id="r-amount"></dd>
+      <dt>支付宝异步通知地址</dt>
+      <dd class="mono" id="r-alipay-url"></dd>
+      <dt>微信异步通知地址</dt>
+      <dd class="mono" id="r-wechat-url"></dd>
+    </dl>
+    <div class="mock-block" id="mock-hint">
+      <strong>本地 / 测试环境（mock）</strong>
+      <p style="margin:8px 0 0 0;">真实生产需由服务端调起支付宝、微信收银台。联调时可使用仓库内脚本模拟支付成功回调：</p>
+      <code id="cmd-alipay"></code>
+      <code id="cmd-wechat" style="margin-top:10px;"></code>
+      <p style="margin:10px 0 0 0;">执行后请到 <a href="/membership">会员信息</a> 或 <a href="/recharge-records">充值信息</a> 查看是否已支付。</p>
+    </div>
+  </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function() {
+  var token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = '/login';
+    return;
+  }
+  var selectedType = null;
+  var authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function showMsg(text, isError) {
+    var el = document.getElementById('msg');
+    el.textContent = text;
+    el.className = 'msg section-msg ' + (isError ? 'error' : 'success');
+    el.style.display = 'block';
+  }
+
+  document.getElementById('logout-nav').onclick = function() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+  };
+
+  fetch('/api/pay/membership-options')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('options-loading').style.display = 'none';
+      if (!data || !data.ok || !data.options || !data.options.length) {
+        showMsg('无法加载充值档位', true);
+        return;
+      }
+      var area = document.getElementById('options-area');
+      area.style.display = 'block';
+      area.innerHTML = '<div class="option-list" id="option-list"></div>';
+      var list = document.getElementById('option-list');
+      data.options.forEach(function(opt, i) {
+        var id = 'opt-' + opt.membership_type;
+        var card = document.createElement('label');
+        card.className = 'option-card' + (i === 0 ? ' selected' : '');
+        card.innerHTML =
+          '<input type="radio" name="mtype" id="' + id + '" value="' + opt.membership_type + '"' + (i === 0 ? ' checked' : '') + '>' +
+          '<div class="meta"><div class="name">' + opt.label + '</div></div>' +
+          '<div class="price">¥' + opt.price + '</div>';
+        list.appendChild(card);
+        if (i === 0) selectedType = opt.membership_type;
+      });
+      list.querySelectorAll('.option-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+          list.querySelectorAll('.option-card').forEach(function(c) { c.classList.remove('selected'); });
+          card.classList.add('selected');
+          var inp = card.querySelector('input');
+          if (inp) { inp.checked = true; selectedType = inp.value; }
+        });
+      });
+      list.querySelectorAll('input[name="mtype"]').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          selectedType = inp.value;
+          list.querySelectorAll('.option-card').forEach(function(c) { c.classList.remove('selected'); });
+          if (inp.closest('.option-card')) inp.closest('.option-card').classList.add('selected');
+        });
+      });
+      document.getElementById('btn-create').disabled = false;
+    })
+    .catch(function() {
+      document.getElementById('options-loading').style.display = 'none';
+      showMsg('网络错误', true);
+    });
+
+  document.getElementById('btn-create').onclick = function() {
+    document.getElementById('msg').style.display = 'none';
+    if (!selectedType) { showMsg('请选择档位', true); return; }
+    var btn = document.getElementById('btn-create');
+    btn.disabled = true;
+    fetch('/api/pay/orders', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ membership_type: selectedType })
+    })
+      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.data.ok) {
+          showMsg((res.data && res.data.message) || '创建失败', true);
+          btn.disabled = false;
+          return;
+        }
+        var d = res.data;
+        document.getElementById('order-result').style.display = 'block';
+        document.getElementById('r-out-no').textContent = d.out_trade_no;
+        document.getElementById('r-subject').textContent = d.subject;
+        document.getElementById('r-amount').textContent = d.total_amount;
+        document.getElementById('r-alipay-url').textContent = d.notify_url || '';
+        document.getElementById('r-wechat-url').textContent = d.wechat_notify_url || '';
+        var origin = window.location.origin;
+        var mockAlipay = 'cd fb-platform && python3 scripts/simulate_alipay_notify.py \\\n  --base-url ' + origin + ' \\\n  --out-trade-no ' + d.out_trade_no + ' \\\n  --total-amount ' + d.total_amount;
+        if (d.simulate && d.simulate.needs_mock_header && d.simulate.header_name) {
+          mockAlipay += ' \\\n  --mock-secret <你的 ' + d.simulate.header_name + '>';
+        }
+        document.getElementById('cmd-alipay').textContent = mockAlipay;
+        var mockWx = 'cd fb-platform && python3 scripts/simulate_wechat_notify.py \\\n  --base-url ' + origin + ' \\\n  --out-trade-no ' + d.out_trade_no + ' \\\n  --total-amount ' + d.total_amount;
+        if (d.wechat && d.wechat.simulate && d.wechat.simulate.needs_mock_header) {
+          mockWx += ' \\\n  --mock-secret <你的 ' + (d.wechat.simulate.header_name || 'X-Wechat-Mock-Secret') + '>';
+        }
+        document.getElementById('cmd-wechat').textContent = mockWx;
+        showMsg('订单已创建', false);
+        btn.disabled = false;
+        document.getElementById('order-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      })
+      .catch(function() {
+        showMsg('网络错误', true);
+        btn.disabled = false;
+      });
+  };
+})();
+</script>
+{% endblock %}

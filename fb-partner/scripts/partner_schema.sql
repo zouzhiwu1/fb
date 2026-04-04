@@ -1,122 +1,25 @@
 -- =============================================================================
--- fb 全库初始化（platform + partner 共用 MySQL 库）
+-- fb-partner：Partner 侧表结构（仅 CREATE TABLE，无 ALTER）
 -- =============================================================================
--- 与以下代码保持一致（变更表结构时请同步改此文件）：
---   fb-platform/app/models.py
---   fb-partner/app/models.py
+-- 与仓库根目录 scripts/init_database.sql 中 partner 段保持一致；变更表结构时请两处同步。
 --
--- 警告：会 DROP 下列表并重建，所有业务数据清空。仅用于空库、开发/测试或明确要重建时。
--- 成功后：配置 PARTNER_ROOT_PASSWORD、JWT 等并重启 platform / partner。
+-- 何时用本文件：
+--   • 已有 platform 的 MySQL 库（含 users 等），仅需补齐 partner 四张表时，可先确认 users 是否需要 agent_id（见文末注释），再执行本文件。
+--   • 空库全量初始化请直接用仓库根 scripts/init_database.sql（含 DROP/CREATE 全表）。
 --
--- 用法（将 YOUR_DB 换成 .env 中 DATABASE_URL 的库名）：
---   mysql -h HOST -u USER -p YOUR_DB < scripts/init_database.sql
+-- 用法：
+--   mysql -h HOST -u USER -p YOUR_DB < fb-partner/scripts/partner_schema.sql
 --
--- 或在本机已配置 partner/.env 时：
---   cd fb-partner && .venv/bin/python scripts/init_database.py
---
--- DBeaver（最容易踩坑）：
---   • 「执行 SQL 语句」（菜单第一项、工具栏最上面单独闪电 / 快捷键 Ctrl+Enter）：
---     只会执行光标所在的【那一条】语句。即使用 Cmd+A 全选，也不会按顺序跑完整文件，表不会建好。
---   • 必须用「执行 SQL 脚本」（菜单第二项 Execute SQL Script、闪电旁带小文档/脚本的图标、多为 Alt+X）：
---     才会从第一行到最后一行顺序执行全部 DROP/CREATE。
---   • 单独跑到 CREATE points_ledger 而没建 agents → 报 1824。
---   • 执行成功后：左侧 fb → 表 → 右键 → 刷新。
---
--- 其它客户端：命令行建议 mysql … YOUR_DB < init_database.sql（库名在命令里指定）。
--- DBeaver：若左侧未选中库，请取消下面注释并把库名改成与 .env 一致（与 init_database.py 无关）。
+-- 说明：scripts/ 下 migrate_*.sql、extend_*.sql、add_*.sql 为历史增量迁移；新部署以本文件 + 根目录 init_database.sql 为准。
 -- =============================================================================
-
--- USE fb;
 
 SET NAMES utf8mb4;
 
-/* DBeaver：带「闪电+文档」= 执行整个脚本（Execute SQL Script），多为 Alt+X。
-   仅「闪电」= Ctrl+Enter 只跑光标一句，建表不会执行。成功后：表 → 右键 → 刷新。 */
-SELECT '若只有本行结果、没有表：你用了 Ctrl+Enter，请 Alt+X 执行完整文件' AS dbeaver_check;
-
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS agent_commission_settlements;
-DROP TABLE IF EXISTS points_ledger;
-DROP TABLE IF EXISTS payment_orders;
-DROP TABLE IF EXISTS membership_records;
-DROP TABLE IF EXISTS agents;
-DROP TABLE IF EXISTS partner_admins;
-DROP TABLE IF EXISTS evaluation_matches;
-DROP TABLE IF EXISTS verification_codes;
-DROP TABLE IF EXISTS users;
-
 -- ---------------------------------------------------------------------------
--- platform（用户、验证码、会员、评估队列、支付订单）
+-- 以下四张表：按外键依赖顺序创建
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
-    username VARCHAR(64) NULL COMMENT '登录用户名，唯一；兼容旧数据可为空',
-    gender VARCHAR(10) NULL COMMENT '性别：男/女/其他',
-    phone VARCHAR(20) NOT NULL COMMENT '手机号，注册必填，唯一',
-    email VARCHAR(128) NULL COMMENT '邮箱',
-    password_hash VARCHAR(255) NULL COMMENT '密码哈希；新注册必填，兼容旧数据可为空',
-    session_version INT NOT NULL DEFAULT 1 COMMENT '登录会话版本号：每次登录自增，旧 token 失效',
-    created_at DATETIME NULL COMMENT '记录创建时间（应用层通常为 UTC）',
-    updated_at DATETIME NULL COMMENT '记录最后更新时间（应用层通常为 UTC）',
-    free_week_granted_at DATETIME NULL COMMENT '新人赠送周会员的生效时间；非空表示已赠送过（每人仅一次）',
-    agent_id INT NULL COMMENT '拉新归属代理商 agents.id；无 FK 便于迁移顺序',
-    UNIQUE KEY uk_username (username),
-    UNIQUE KEY uk_phone (phone),
-    INDEX idx_email (email),
-    INDEX ix_users_agent_id (agent_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
-
-CREATE TABLE verification_codes (
-    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
-    phone VARCHAR(20) NOT NULL COMMENT '接收验证码的手机号',
-    code VARCHAR(10) NOT NULL COMMENT '验证码明文或存储值',
-    expires_at DATETIME NOT NULL COMMENT '验证码过期时间',
-    used_at DATETIME NULL COMMENT '校验成功并消费的时间；未使用则为空',
-    created_at DATETIME NULL COMMENT '本条验证码记录生成时间',
-    INDEX idx_phone (phone)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信验证码记录';
-
-CREATE TABLE evaluation_matches (
-    match_date CHAR(8) NOT NULL COMMENT '比赛日 YYYYMMDD',
-    home_team VARCHAR(128) NOT NULL COMMENT '主场球队名称',
-    away_team VARCHAR(128) NOT NULL COMMENT '客场球队名称',
-    PRIMARY KEY (match_date, home_team, away_team)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='正在综合评估的比赛';
-
-CREATE TABLE membership_records (
-    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
-    user_id INT NOT NULL COMMENT '用户 ID，外键关联 users.id',
-    membership_type VARCHAR(20) NOT NULL COMMENT '会员类型：week/month/quarter/year',
-    effective_at DATETIME NOT NULL COMMENT '会员权益开始生效时间',
-    expires_at DATETIME NOT NULL COMMENT '会员权益到期时间',
-    source VARCHAR(20) NOT NULL COMMENT '来源：gift 新人赠送 / purchase 付费购买',
-    order_id VARCHAR(128) NULL COMMENT '付费订单号；赠送场景可为空',
-    INDEX idx_user_id (user_id),
-    CONSTRAINT fk_membership_records_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员记录';
-
-CREATE TABLE payment_orders (
-    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
-    out_trade_no VARCHAR(64) NOT NULL COMMENT '商户订单号',
-    user_id INT NOT NULL COMMENT '用户 ID，外键关联 users.id',
-    membership_type VARCHAR(20) NOT NULL COMMENT '购买的会员类型：week/month/quarter/year',
-    total_amount VARCHAR(16) NOT NULL COMMENT '与支付宝 total_amount 一致',
-    subject VARCHAR(256) NOT NULL COMMENT '订单标题/商品描述',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending/paid/closed',
-    trade_no VARCHAR(64) NULL COMMENT '支付宝交易号',
-    created_at DATETIME NULL COMMENT '订单创建时间',
-    paid_at DATETIME NULL COMMENT '支付完成时间；未支付为空',
-    UNIQUE KEY uk_out_trade_no (out_trade_no),
-    KEY idx_user_id (user_id),
-    CONSTRAINT fk_payment_orders_user FOREIGN KEY (user_id) REFERENCES users (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员支付订单';
-
--- ---------------------------------------------------------------------------
--- partner（管理员、代理商、服务费结算流水、积分流水）
--- ---------------------------------------------------------------------------
-
-CREATE TABLE partner_admins (
+CREATE TABLE IF NOT EXISTS partner_admins (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     login_name VARCHAR(64) NOT NULL COMMENT '管理员登录名，唯一',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
@@ -127,7 +30,7 @@ CREATE TABLE partner_admins (
     KEY ix_partner_admins_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='合作方管理员';
 
-CREATE TABLE agents (
+CREATE TABLE IF NOT EXISTS agents (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     agent_code VARCHAR(32) NOT NULL COMMENT '代理商推广码，唯一',
     login_name VARCHAR(128) NOT NULL COMMENT '代理商登录名（邮箱），唯一',
@@ -153,7 +56,7 @@ CREATE TABLE agents (
     KEY ix_agents_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商档案';
 
-CREATE TABLE agent_commission_settlements (
+CREATE TABLE IF NOT EXISTS agent_commission_settlements (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     partner_admin_id INT NULL COMMENT '操作结算的管理员 ID，关联 partner_admins.id',
     agent_id INT NOT NULL COMMENT '被结算的代理商 ID，关联 agents.id',
@@ -170,7 +73,7 @@ CREATE TABLE agent_commission_settlements (
     CONSTRAINT fk_acs_agent FOREIGN KEY (agent_id) REFERENCES agents (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商服务费结算流水';
 
-CREATE TABLE payout_orders (
+CREATE TABLE IF NOT EXISTS payout_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     order_id VARCHAR(64) NOT NULL COMMENT '支付单号（业务唯一）',
     agent_id INT NOT NULL COMMENT '代理商 ID，关联 agents.id',
@@ -190,7 +93,8 @@ CREATE TABLE payout_orders (
     CONSTRAINT fk_po_admin FOREIGN KEY (paid_by_admin_id) REFERENCES partner_admins (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='服务费支付主表（线下打款批次）';
 
-CREATE TABLE agent_commission_lines (
+-- 依赖 payout_orders：若单独执行本段而无主表，MySQL 会报 1824。
+CREATE TABLE IF NOT EXISTS agent_commission_lines (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     agent_id INT NOT NULL COMMENT '代理商 ID，关联 agents.id',
     user_id INT NOT NULL COMMENT '用户 ID',
@@ -224,7 +128,7 @@ CREATE TABLE agent_commission_lines (
     CONSTRAINT fk_acl_payout_order FOREIGN KEY (payout_order_id) REFERENCES payout_orders (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='服务费明细（拉新/充值统一）';
 
-CREATE TABLE points_ledger (
+CREATE TABLE IF NOT EXISTS points_ledger (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
     agent_id INT NOT NULL COMMENT '代理商 ID，关联 agents.id',
     user_id INT NULL COMMENT '关联用户 ID（可空）',
@@ -244,8 +148,14 @@ CREATE TABLE points_ledger (
     CONSTRAINT fk_pl_agent FOREIGN KEY (agent_id) REFERENCES agents (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商积分流水';
 
-SET FOREIGN_KEY_CHECKS = 1;
-
--- 执行结果里应出现 current_database 与约 9 张表；若 current_database 为 NULL 说明未选中库。
-SELECT DATABASE() AS current_database;
-SHOW TABLES;
+-- ---------------------------------------------------------------------------
+-- 与 platform 共用同一库时：若 users 已存在但尚无 agent_id（拉新归属），须补列。以下为说明，按需手动执行（新库见根目录 init_database.sql 的 users 定义）。
+--
+-- ALTER TABLE users
+--   ADD COLUMN agent_id INT NULL COMMENT '拉新归属代理商 agents.id；无 FK 便于迁移顺序',
+--   ADD KEY ix_users_agent_id (agent_id);
+--
+-- 部分客户端要求外键在 agents 建表后再加；若 points_ledger 先建表无 fk，可后续：
+-- ALTER TABLE points_ledger ADD CONSTRAINT fk_pl_agent FOREIGN KEY (agent_id) REFERENCES agents (id);
+-- 本文件已将 fk 写在 CREATE 内，且 agents 先于 points_ledger，一般无需再执行。
+-- ---------------------------------------------------------------------------

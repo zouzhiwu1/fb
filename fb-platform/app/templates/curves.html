@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>曲线图查询 - 绿茵战术前瞻</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      max-width: 100%;
+      width: min(1320px, 100% - 32px);
+      margin: 0 auto;
+      padding: 1rem;
+      padding-bottom: 2.5rem;
+      background: linear-gradient(165deg, #eef2ff 0%, #f1f5f9 50%, #f8fafc 100%);
+      min-height: 100vh;
+      overflow-x: clip;
+      overflow-y: auto;
+    }
+    @media (min-width: 768px) {
+      body { width: min(1320px, 100% - 48px); padding: 1.25rem 1.5rem 2.5rem; }
+    }
+    /* 整页滚动；查询区 sticky，与移动端 App 类似始终可操作 */
+    .page { display: block; }
+    .curves-query-dock {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      margin: -1rem -1rem 0.75rem -1rem;
+      padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem 12px 1rem;
+      background: rgba(248, 250, 252, 0.97);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+    }
+    @media (min-width: 768px) {
+      .curves-query-dock {
+        margin: -1.25rem -1.5rem 0.75rem -1.5rem;
+        padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.5rem 14px 1.5rem;
+      }
+    }
+    .curves-query-dock h1 {
+      font-size: 1.5rem;
+      color: #333;
+      margin: 0 0 0.65rem 0;
+    }
+    .curves-query-dock .back-link { margin-bottom: 0.5rem; }
+    .curves-query-dock .search-bar { margin-bottom: 0.65rem; }
+    .curves-hint {
+      margin: 0 0 0.65rem 0;
+      font-size: 0.9rem;
+      color: #64748b;
+      line-height: 1.45;
+    }
+    .curves-query-dock .message { margin-bottom: 0.5rem; }
+    .search-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 1rem;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .search-bar label { font-weight: 500; color: #555; }
+    .search-bar input, .search-bar select {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    .search-bar input[type="text"] { min-width: 160px; }
+    .search-bar button {
+      padding: 0.5rem 1.25rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .search-bar button:hover { background: #1d4ed8; }
+    .search-bar button:disabled { background: #94a3b8; cursor: not-allowed; }
+    .message { padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
+    .message.info { background: #e0f2fe; color: #0369a1; }
+    .message.error { background: #fee2e2; color: #b91c1c; }
+    .message.empty { background: #f1f5f9; color: #64748b; }
+    .results-wrap { margin-top: 0.25rem; }
+    .results {
+      display: grid;
+      gap: 1.25rem;
+      padding-bottom: 2rem;
+      grid-template-columns: 1fr;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem 1rem 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid #e2e8f0;
+      overflow-x: hidden;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .card h3 { margin: 0 0 0.75rem 0; font-size: 1.1rem; color: #1e293b; }
+    .card .chart-frame {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      line-height: 0;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+    /*
+     * 手机：chart-frame 与卡片同宽（全宽），显示比例保持现状。
+     * 平板/电脑：限制图区最大宽度并居中，整体缩小，避免大图占满屏、横向溢出。
+     */
+    @media (min-width: 768px) {
+      .card .chart-frame {
+        max-width: min(600px, 100%);
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+    @media (min-width: 1024px) {
+      .card .chart-frame {
+        max-width: min(680px, 100%);
+      }
+    }
+    @media (min-width: 1280px) {
+      .card .chart-frame {
+        max-width: min(760px, 100%);
+      }
+    }
+    .card img {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+    .back-link { font-size: 0.9rem; margin-bottom: 1rem; }
+    .back-link a { color: #2563eb; text-decoration: none; }
+    .back-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="curves-query-dock">
+      <p class="back-link"><a href="/home">← 返回首页</a></p>
+      <h1>曲线图查询</h1>
+      <div class="search-bar">
+        <label for="dateInput">日期 <span style="color:#b91c1c">*</span></label>
+        <input type="date" id="dateInput" title="请选择日期">
+        <label for="team">球队名</label>
+        <input type="text" id="team" placeholder="主队或客队名称（选填）">
+        <button type="button" id="btnSearch">搜索</button>
+      </div>
+      <p class="curves-hint">日期必填；球队名选填。留空球队名时会返回该日期全部曲线图。数据来自 fb-pipeline 生成的曲线图。</p>
+      <div id="message" class="message" style="display: none;"></div>
+    </div>
+    <div class="results-wrap">
+      <div id="results" class="results"></div>
+    </div>
+  </div>
+
+  <script>
+    const dateInput = document.getElementById('dateInput');
+    const teamInput = document.getElementById('team');
+    const btnSearch = document.getElementById('btnSearch');
+    const messageEl = document.getElementById('message');
+    const resultsEl = document.getElementById('results');
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = 'message ' + (type || 'info');
+      messageEl.style.display = 'block';
+    }
+
+    function hideMessage() {
+      messageEl.style.display = 'none';
+    }
+
+    function normalizeDateInput(v) {
+      // YYYY-MM-DD -> YYYYMMDD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v.replace(/-/g, '');
+      // 兼容旧输入（若浏览器不支持 type=date）
+      if (/^\d{8}$/.test(v)) return v;
+      return '';
+    }
+
+    function getDate() {
+      const byInput = normalizeDateInput(dateInput.value.trim());
+      return byInput;
+    }
+
+    function dateToInputValue(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function getAuthHeaders() {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+      const h = { 'Content-Type': 'application/json' };
+      if (token) h['Authorization'] = 'Bearer ' + token;
+      return h;
+    }
+
+    async function search() {
+      const date = getDate();
+      const team = teamInput.value.trim();
+      if (!date) {
+        showMessage('请选择或输入有效日期（YYYYMMDD）', 'error');
+        return;
+      }
+      btnSearch.disabled = true;
+      hideMessage();
+      resultsEl.innerHTML = '';
+
+      try {
+        const url = '/api/curves/search?date=' + encodeURIComponent(date) + '&team=' + encodeURIComponent(team);
+        const r = await fetch(url, { headers: getAuthHeaders() });
+        const data = await r.json();
+        if (r.status === 401 || (data.message && data.message.indexOf('登录') !== -1)) {
+          showMessage('请先登录后再查询。', 'error');
+          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="/login">去登录</a></p>';
+          return;
+        }
+        if (data.member_only && data.message) {
+          showMessage(data.message, 'info');
+          return;
+        }
+        if (data.error) {
+          showMessage(data.error, 'error');
+          return;
+        }
+        const items = data.items || [];
+        if (items.length === 0) {
+          showMessage(
+            team
+              ? '该日期下没有找到与该球队相关的曲线图（若确定目录里有图，可能是队名与文件名不完全一致）。'
+              : '该日期下没有找到曲线图。',
+            'empty'
+          );
+          return;
+        }
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          const title = document.createElement('h3');
+          title.textContent = item.home + ' VS ' + item.away;
+          const img = document.createElement('img');
+          img.alt = item.home + ' VS ' + item.away;
+          img.loading = 'lazy';
+          loadImageWithAuth(img, item.date, item.filename);
+          const frame = document.createElement('div');
+          frame.className = 'chart-frame';
+          frame.appendChild(img);
+          card.appendChild(title);
+          card.appendChild(frame);
+          resultsEl.appendChild(card);
+        });
+      } catch (e) {
+        showMessage('请求失败：' + e.message, 'error');
+      } finally {
+        btnSearch.disabled = false;
+      }
+    }
+
+    function loadImageWithAuth(imgEl, date, filename) {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+      if (!token) return;
+      fetch('/api/curves/img/' + encodeURIComponent(date) + '/' + encodeURIComponent(filename), {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+        .then(r => {
+          if (!r.ok) throw new Error(r.status === 403 ? '仅会员可查看' : '加载失败');
+          return r.blob();
+        })
+        .then(blob => {
+          imgEl.src = URL.createObjectURL(blob);
+        })
+        .catch(() => {
+          imgEl.alt = imgEl.alt + '（加载失败）';
+        });
+    }
+
+    async function initDefaultSearch() {
+      teamInput.value = '';
+      let isMemberUser = false;
+      try {
+        const r = await fetch('/api/membership/status', { headers: getAuthHeaders() });
+        const data = await r.json();
+        if (r.status === 401 || (data && data.ok === false)) {
+          showMessage('请先登录后再查询。', 'error');
+          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="/login">去登录</a></p>';
+          return;
+        }
+        isMemberUser = !!(data && data.is_member);
+      } catch (e) {
+        // 会员状态获取失败时，默认按非会员初始化，避免误展示会员当天数据。
+        isMemberUser = false;
+      }
+
+      const d = new Date();
+      if (!isMemberUser) d.setDate(d.getDate() - 1);
+      dateInput.value = dateToInputValue(d);
+      await search();
+    }
+
+    btnSearch.addEventListener('click', search);
+    teamInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') search();
+    });
+    initDefaultSearch();
+  </script>
+</body>
+</html>

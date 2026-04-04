@@ -1,10 +1,13 @@
-football-betting-data/
-football-betting-log/
-football-betting-report/
+fb-data/
+fb-log/
+fb-report/
+
+__pycache__/
+*.py[cod]
 
 # 根目录总配置（含密钥）；提交请使用 .env.example
 .env
-football-betting-platform/.env
-football-betting-pipeline/.env
-football-betting-mobile/.env
-football-betting-partner/.partner.pid
+fb-platform/.env
+fb-pipeline/.env
+fb-mobile/.env
+fb-partner/.partner.pid

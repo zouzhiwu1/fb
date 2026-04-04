@@ -1,0 +1,19 @@
+# 由 install-systemd.sh 替换 @INSTALL_ROOT@ 后安装到 /etc/systemd/system/
+# 业务日志由应用写入：<仓库根>/fb-log/platform_YYYYMMDD.log（与 pipeline 同级目录习惯一致）
+# 标准输出仍在 journal：journalctl -u fb-platform -f
+
+[Unit]
+Description=fb-platform (Flask)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=@INSTALL_ROOT@
+EnvironmentFile=-@INSTALL_ROOT@/.env
+ExecStart=@INSTALL_ROOT@/.venv/bin/python @INSTALL_ROOT@/run.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
