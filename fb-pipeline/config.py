@@ -13,6 +13,7 @@
   CRAWLER_DEBUG_MATCH_KEYWORDS  球队白名单关键词（逗号分隔）；设为空字符串表示不限制球队
   CRAWLER_TARGET_LEAGUES  联赛白名单（逗号分隔）；设为空字符串表示不限制联赛
   CRAWLER_EXPORT_EXCEL_MAX_ATTEMPTS  单场「导出 Excel」最多重试次数（默认 3）
+  CRAWLER_EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS  每次点击导出后等待目录内出现 .xls 的最长时间（秒，默认 15；智云常固定文件名覆盖，需结合 mtime 检测）
   CRAWLER_MATCH_FILTER_VISIBLE_ONLY  1=只收集页面上可见行；0=含 DOM 隐藏行
   CRAWLER_MATCH_STATUS_MODES  状态过滤，逗号分隔：not_started,live,finished（默认 not_started）
   CRAWLER_MATCH_REQUIRE_JIAN  1=仅保留包含“荐”的比赛；0=不过滤“荐”（默认 1）
@@ -215,5 +216,7 @@ WAIT_TABLE_REFRESH = 3
 WAIT_FIRST_ROW_CHANGED = 12
 # 单场「导出 Excel」未检测到新文件时的最大重试次数（仅重试点击导出，不含整页重新导航）
 EXPORT_EXCEL_MAX_ATTEMPTS = int(os.environ.get("CRAWLER_EXPORT_EXCEL_MAX_ATTEMPTS", "3"))
-# 每次点击导出后，在下载目录内等待新 .xls 的最长时间（秒）
-EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS = 3.0
+# 每次点击导出后，在下载目录内等待 .xls 落盘的最长时间（秒）。过短易漏检；站点多次导出同名覆盖时依赖 mtime 检测。
+EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS = float(
+    os.environ.get("CRAWLER_EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS", "15")
+)
