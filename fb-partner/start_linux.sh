@@ -5,7 +5,8 @@ cd "$ROOT"
 PY="${ROOT}/.venv/bin/python"
 LOG_PARENT="$(cd "${ROOT}/.." && pwd)"
 LOG_DIR="${LOG_PARENT}/fb-log"
-mkdir -p "$LOG_DIR"
+DAY="$(date +%Y%m%d)"
+mkdir -p "${LOG_DIR}/${DAY}"
 export PORT="${PORT:-5002}"
 
 if [[ ! -x "$PY" ]]; then
@@ -22,6 +23,6 @@ if [[ -f "$PID_FILE" ]]; then
     sleep 1
   fi
 fi
-nohup env PORT="$PORT" "$PY" "${ROOT}/run.py" >>"${LOG_DIR}/partner_nohup.log" 2>&1 &
+nohup env PORT="$PORT" "$PY" "${ROOT}/run.py" >>"${LOG_DIR}/${DAY}/partner_nohup.log" 2>&1 &
 echo $! >"$PID_FILE"
 echo "partner 已在后台启动 PID=$(cat "$PID_FILE") PORT=$PORT"

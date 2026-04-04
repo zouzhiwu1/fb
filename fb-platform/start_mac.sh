@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macOS：后台启动平台进程（nohup）。业务日志写入 <仓库根>/fb-log/platform_YYYYMMDD.log
+# macOS：后台启动平台进程（nohup）。业务日志写入 <仓库根>/fb-log/YYYYMMDD/platform_YYYYMMDD.log
 # 停止：./stop_mac.sh
 set -euo pipefail
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -12,9 +12,9 @@ PY="${ROOT}/.venv/bin/python"
 LOG_PARENT="$(cd "${ROOT}/.." && pwd)"
 LOG_DIR="${LOG_PARENT}/fb-log"
 DAY="$(date +%Y%m%d)"
-PLATFORM_LOG="${LOG_DIR}/platform_${DAY}.log"
+PLATFORM_LOG="${LOG_DIR}/${DAY}/platform_${DAY}.log"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$(dirname "$PLATFORM_LOG")"
 
 if [[ ! -x "$PY" ]]; then
   echo "未找到 ${PY}。请先:" >&2

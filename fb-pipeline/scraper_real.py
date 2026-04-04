@@ -35,6 +35,7 @@ from config import (
     BASE_URL,
     DOWNLOAD_DIR,
     DEBUG_LOG_DIR,
+    dated_debug_log_dir,
     CUTOFF_HOUR,
     DEBUG_MAX_MATCHES,
     TEAM_WHITELIST_KEYWORDS,
@@ -780,10 +781,10 @@ class ZhiyunScraper:
         return candidates[0]
 
     def _save_debug_page_source(self, index, home, away):
-        """未找到导出按钮时保存当前页面 HTML，便于排查选择器。输出到 DEBUG_LOG_DIR。"""
+        """未找到导出按钮时保存当前页面 HTML，便于排查选择器。输出到 DEBUG_LOG_DIR/YYYYMMDD/。"""
         try:
-            os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
-            debug_dir = DEBUG_LOG_DIR
+            debug_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+            os.makedirs(debug_dir, exist_ok=True)
             safe = re.sub(r'[\s\\/:*?"<>|]', "_", f"{index}_{home}_{away}")[:80]
             path = os.path.join(debug_dir, f"debug_export_page_{safe}.html")
             with open(path, "w", encoding="utf-8") as f:

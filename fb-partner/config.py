@@ -186,16 +186,19 @@ class DailyPartnerFileHandler(logging.FileHandler):
         os.makedirs(log_dir, exist_ok=True)
         self._current_date = datetime.date.today()
         path = self._path_for_date(self._current_date)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         super().__init__(path, encoding=encoding, delay=False)
 
     def _path_for_date(self, d: datetime.date) -> str:
-        return os.path.join(self.log_dir, f"partner_{d.strftime('%Y%m%d')}.log")
+        day = d.strftime("%Y%m%d")
+        return os.path.join(self.log_dir, day, f"partner_{day}.log")
 
     def emit(self, record):
         today = datetime.date.today()
         if self._current_date != today:
             self.close()
             self.baseFilename = os.path.abspath(self._path_for_date(today))
+            os.makedirs(os.path.dirname(self.baseFilename), exist_ok=True)
             self.stream = self._open()
             self._current_date = today
         super().emit(record)

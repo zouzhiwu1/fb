@@ -12,7 +12,7 @@
     - 无参数：使用昨日日期（与 crawl_final.py 默认一致）
     - 有参数：使用指定日期，与报告目录 REPORT_DIR/YYYYMMDD 对应
 
-日志：DEBUG_LOG_DIR/run_final_{YYYYMMDDHH}.log
+日志：DEBUG_LOG_DIR/YYYYMMDD/run_final_{YYYYMMDDHH}.log
 """
 import logging
 import os
@@ -20,7 +20,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 
-from config import DEBUG_LOG_DIR, LOG_RETENTION_DAYS
+from config import DEBUG_LOG_DIR, LOG_RETENTION_DAYS, dated_debug_log_dir
 from log_cleanup import delete_old_logs
 
 # 与 run_real.py 相同：子进程 cwd 固定为 pipeline 目录，避免 Docker 下 CWD=/app 找不到脚本。
@@ -28,10 +28,11 @@ _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _setup_logging():
-    """配置 run_final 日志到 run_final_{YYYYMMDDHH}.log。"""
-    os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
+    """配置 run_final 日志到 YYYYMMDD/run_final_{YYYYMMDDHH}.log。"""
+    day_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+    os.makedirs(day_dir, exist_ok=True)
     time_suffix = datetime.now().strftime("%Y%m%d%H")
-    log_path = os.path.join(DEBUG_LOG_DIR, f"run_final_{time_suffix}.log")
+    log_path = os.path.join(day_dir, f"run_final_{time_suffix}.log")
     logger = logging.getLogger("run_final")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
@@ -55,8 +56,11 @@ def main():
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
         _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
-        log.info("已删除 %d 个超过 %d 天的日志: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
+        rel_removed = [
+            os.path.relpath(os.path.join(DEBUG_LOG_DIR, p.rstrip("/")), _display_root)
+            for p in removed
+        ]
+        log.info("已删除 %d 项超过 %d 天的日志: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 
     args = sys.argv[1:]
     if len(args) == 0:

@@ -73,28 +73,31 @@ LOG_DIR = os.environ.get(
     "LOG_DIR",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fb-log"),
 )
-# 若设置 LOG_FILE 则写入该固定路径（测试或特殊部署）；否则为 platform_YYYYMMDD.log 按自然日切换
+# 若设置 LOG_FILE 则写入该固定路径（测试或特殊部署）；否则为 fb-log/YYYYMMDD/platform_YYYYMMDD.log 按自然日切换
 LOG_FILE = os.environ.get("LOG_FILE", "").strip()
 
 
 class DailyPlatformFileHandler(logging.FileHandler):
-    """写入 LOG_DIR/platform_YYYYMMDD.log，跨自然日自动换文件。"""
+    """写入 LOG_DIR/YYYYMMDD/platform_YYYYMMDD.log，跨自然日自动换子目录与文件。"""
 
     def __init__(self, log_dir, encoding="utf-8"):
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
         self._current_date = datetime.date.today()
         path = self._path_for_date(self._current_date)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         super().__init__(path, encoding=encoding, delay=False)
 
     def _path_for_date(self, d: datetime.date) -> str:
-        return os.path.join(self.log_dir, f"platform_{d.strftime('%Y%m%d')}.log")
+        day = d.strftime("%Y%m%d")
+        return os.path.join(self.log_dir, day, f"platform_{day}.log")
 
     def emit(self, record):
         today = datetime.date.today()
         if self._current_date != today:
             self.close()
             self.baseFilename = os.path.abspath(self._path_for_date(today))
+            os.makedirs(os.path.dirname(self.baseFilename), exist_ok=True)
             self.stream = self._open()
             self._current_date = today
         super().emit(record)

@@ -31,7 +31,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 
-from config import DOWNLOAD_DIR, REPORT_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS
+from config import DOWNLOAD_DIR, REPORT_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS, dated_debug_log_dir
 from evaluation_sync import sync_matches_from_car_for_date
 from log_cleanup import delete_old_logs
 
@@ -53,9 +53,10 @@ PLOT_OUPEI_TITLE = "oupei\u6307\u6570\u66f2\u7ebf\u56fe"
 
 def _setup_logging():
     """配置详细日志到独立文件：plot_car_{YYYYMMDDHH}.log。"""
-    os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
+    day_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+    os.makedirs(day_dir, exist_ok=True)
     time_suffix = datetime.datetime.now().strftime("%Y%m%d%H")
-    log_path = os.path.join(DEBUG_LOG_DIR, f"plot_car_{time_suffix}.log")
+    log_path = os.path.join(day_dir, f"plot_car_{time_suffix}.log")
     logger = logging.getLogger("plot_car")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
@@ -335,8 +336,11 @@ def main():
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
         _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
+        rel_removed = [
+            os.path.relpath(os.path.join(DEBUG_LOG_DIR, p.rstrip("/")), _display_root)
+            for p in removed
+        ]
+        log.info("已删除 %d 项超过 %d 天的日志: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
     _setup_chinese_font()
 
     args = sys.argv[1:]

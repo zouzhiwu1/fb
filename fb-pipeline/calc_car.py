@@ -19,7 +19,7 @@ import sys
 
 import pandas as pd
 
-from config import DOWNLOAD_DIR, REPORT_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS
+from config import DOWNLOAD_DIR, REPORT_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS, dated_debug_log_dir
 from log_cleanup import delete_old_logs
 
 # 与 merge_data 一致：一览表 12 列，A/B/C=主队/客队/时间点，D～L=数据列（索引 3～11）
@@ -34,9 +34,10 @@ COL_RANGE_VARP = (9, 11)         # J～L
 
 def _setup_logging():
     """配置详细日志到独立文件：calc_car_{YYYYMMDDHH}.log。"""
-    os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
+    day_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+    os.makedirs(day_dir, exist_ok=True)
     time_suffix = datetime.datetime.now().strftime("%Y%m%d%H")
-    log_path = os.path.join(DEBUG_LOG_DIR, f"calc_car_{time_suffix}.log")
+    log_path = os.path.join(day_dir, f"calc_car_{time_suffix}.log")
     logger = logging.getLogger("calc_car")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
@@ -165,8 +166,11 @@ def main():
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
         _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
+        rel_removed = [
+            os.path.relpath(os.path.join(DEBUG_LOG_DIR, p.rstrip("/")), _display_root)
+            for p in removed
+        ]
+        log.info("已删除 %d 项超过 %d 天的日志: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
 
     args = sys.argv[1:]
     if len(args) != 2 or not all(len(a) == 10 and a.isdigit() for a in args):

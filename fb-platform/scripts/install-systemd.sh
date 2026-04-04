@@ -9,7 +9,7 @@ TARGET="/etc/systemd/system/${SERVICE_NAME}.service"
 WORK_ROOT="$(cd "${ROOT}/.." && pwd)"
 APP_LOG_DIR="${WORK_ROOT}/fb-log"
 DAY="$(date +%Y%m%d)"
-APP_LOG="${APP_LOG_DIR}/platform_${DAY}.log"
+APP_LOG="${APP_LOG_DIR}/${DAY}/platform_${DAY}.log"
 
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "未找到 systemctl：本脚本只用于带 systemd 的 Linux（如云服务器），macOS 请勿执行。" >&2
@@ -31,7 +31,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   exit 1
 fi
 
-mkdir -p "$APP_LOG_DIR"
+mkdir -p "$APP_LOG_DIR" "$(dirname "$APP_LOG")"
 chmod 755 "$APP_LOG_DIR"
 
 tmp=$(mktemp)
@@ -45,7 +45,7 @@ systemctl restart "$SERVICE_NAME"
 
 echo ""
 echo "=== fb-platform 已安装并重启 ==="
-echo "业务日志:  $APP_LOG_DIR/platform_YYYYMMDD.log  （当天示例: $APP_LOG）"
+echo "业务日志:  $APP_LOG_DIR/YYYYMMDD/platform_YYYYMMDD.log  （当天示例: $APP_LOG）"
 echo "看今天日志: tail -f ${APP_LOG}"
 echo "日常重启请: ${ROOT}/start_linux.sh"
 echo "仅当改了单元模板或项目路径变了再: sudo ${ROOT}/scripts/install-systemd.sh"

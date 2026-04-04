@@ -33,7 +33,7 @@ import unicodedata
 
 import pandas as pd
 
-from config import DOWNLOAD_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS
+from config import DOWNLOAD_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS, dated_debug_log_dir
 from log_cleanup import delete_old_logs
 
 
@@ -56,9 +56,10 @@ FILENAME_PATTERN_OLD = re.compile(r"^(.+?)\s+VS\s+(.+)(\d{10})\.xls$", re.IGNORE
 
 def _setup_logging():
     """配置详细日志到独立文件：merge_data_{YYYYMMDDHH}.log。"""
-    os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
+    day_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+    os.makedirs(day_dir, exist_ok=True)
     time_suffix = datetime.datetime.now().strftime("%Y%m%d%H")
-    log_path = os.path.join(DEBUG_LOG_DIR, f"merge_data_{time_suffix}.log")
+    log_path = os.path.join(day_dir, f"merge_data_{time_suffix}.log")
     logger = logging.getLogger("merge_data")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
@@ -255,8 +256,11 @@ def main():
     _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
-        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
-        log.info("已删除 %d 个超过 %d 天的日志文件: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
+        rel_removed = [
+            os.path.relpath(os.path.join(DEBUG_LOG_DIR, p.rstrip("/")), _display_root)
+            for p in removed
+        ]
+        log.info("已删除 %d 项超过 %d 天的日志: %s", len(removed), LOG_RETENTION_DAYS, rel_removed)
     # 确认实际执行的脚本路径（若看不到“原因”等输出，请检查是否运行了其他目录下的脚本）
     _script_path = os.path.abspath(__file__)
     rel_script_path = os.path.relpath(_script_path, _display_root)

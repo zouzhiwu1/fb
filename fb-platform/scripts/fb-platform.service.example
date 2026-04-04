@@ -1,5 +1,5 @@
 # 由 install-systemd.sh 替换 @INSTALL_ROOT@ 后安装到 /etc/systemd/system/
-# 业务日志由应用写入：<仓库根>/fb-log/platform_YYYYMMDD.log（与 pipeline 同级目录习惯一致）
+# 业务日志由应用写入：<仓库根>/fb-log/YYYYMMDD/platform_YYYYMMDD.log（与 pipeline 同级目录习惯一致）
 # 标准输出仍在 journal：journalctl -u fb-platform -f
 
 [Unit]

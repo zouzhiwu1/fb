@@ -9,7 +9,7 @@
 任一步失败则终止，不执行后续步骤。
 
 日志：
-- 详细流程日志写入 DEBUG_LOG_DIR/run_real_{YYYYMMDDHH}.log（按小时分文件，带日期时间）。
+- 详细流程日志写入 DEBUG_LOG_DIR/YYYYMMDD/run_real_{YYYYMMDDHH}.log（按小时分文件）。
 - 若通过 launchd 等重定向 stdout/stderr，则仍可在系统指定的 log/err 文件中看到部分输出。
 
 用法:
@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 import subprocess
 import sys
 
-from config import DEBUG_LOG_DIR, LOG_RETENTION_DAYS, CUTOFF_HOUR
+from config import DEBUG_LOG_DIR, LOG_RETENTION_DAYS, CUTOFF_HOUR, dated_debug_log_dir
 from log_cleanup import delete_old_logs
 
 # 子进程里使用「脚本文件名」相对路径；必须固定 cwd 为本文件所在目录，
@@ -35,10 +35,11 @@ _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _setup_logging():
-    """配置主流程日志到 run_real_{YYYYMMDDHH}.log，并输出到终端。"""
-    os.makedirs(DEBUG_LOG_DIR, exist_ok=True)
+    """配置主流程日志到 YYYYMMDD/run_real_{YYYYMMDDHH}.log，并输出到终端。"""
+    day_dir = dated_debug_log_dir(DEBUG_LOG_DIR)
+    os.makedirs(day_dir, exist_ok=True)
     time_suffix = datetime.now().strftime("%Y%m%d%H")
-    log_path = os.path.join(DEBUG_LOG_DIR, f"run_real_{time_suffix}.log")
+    log_path = os.path.join(day_dir, f"run_real_{time_suffix}.log")
     logger = logging.getLogger("run_real")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
@@ -91,9 +92,12 @@ def main():
     removed = delete_old_logs(DEBUG_LOG_DIR, days=LOG_RETENTION_DAYS)
     if removed:
         _display_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-        rel_removed = [os.path.relpath(p, _display_root) for p in removed]
+        rel_removed = [
+            os.path.relpath(os.path.join(DEBUG_LOG_DIR, p.rstrip("/")), _display_root)
+            for p in removed
+        ]
         log.info(
-            "已删除 %d 个超过 %d 天的日志文件: %s",
+            "已删除 %d 项超过 %d 天的日志（文件或日期目录）: %s",
             len(removed),
             LOG_RETENTION_DAYS,
             rel_removed,

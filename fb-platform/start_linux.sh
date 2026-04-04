@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Linux：后台常驻。首次运行会自动安装 systemd 单元（需 sudo），之后仅重启服务。
-# 业务日志: <仓库根>/fb-log/platform_YYYYMMDD.log
+# 业务日志: <仓库根>/fb-log/YYYYMMDD/platform_YYYYMMDD.log
 # 停止：./stop_linux.sh
 set -euo pipefail
 if [[ "$(uname -s)" != "Linux" ]]; then
@@ -13,11 +13,11 @@ PY="${ROOT}/.venv/bin/python"
 LOG_PARENT="$(cd "${ROOT}/.." && pwd)"
 LOG_DIR="${LOG_PARENT}/fb-log"
 DAY="$(date +%Y%m%d)"
-PLATFORM_LOG="${LOG_DIR}/platform_${DAY}.log"
+PLATFORM_LOG="${LOG_DIR}/${DAY}/platform_${DAY}.log"
 SERVICE="fb-platform"
 UNIT="/etc/systemd/system/${SERVICE}.service"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$(dirname "$PLATFORM_LOG")"
 
 if [[ ! -x "$PY" ]]; then
   echo "未找到 ${PY}。请先:" >&2

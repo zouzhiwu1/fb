@@ -7,7 +7,7 @@
   CRAWLER_CUTOFF_HOUR  跨天时间临界点（时，0～23），默认 12
   CRAWLER_TIMEZONE  用于“当前时间”的时区（决定下载目录/文件名），默认 Asia/Tokyo
   CRAWLER_HEADLESS  设为 1/true 则无头模式（不弹窗），默认 1
-  CRAWLER_DEBUG_LOG_DIR  日志目录（定时任务日志、debug_export_page_*.html 等），默认 fb-log
+  CRAWLER_DEBUG_LOG_DIR  日志根目录（其下再按自然日建 YYYYMMDD 子目录，放当日日志与 debug HTML），默认 fb-log
   CRAWLER_LOG_RETENTION_DAYS  日志保留天数，超过此天数的日志文件将被删除，默认 7
   CRAWLER_DEBUG_MAX_MATCHES  调试时最多抓取场数，0 表示不限制；设为 3 可快速跑通 main 流程验证
   CRAWLER_DEBUG_MATCH_KEYWORDS  球队白名单关键词（逗号分隔）；设为空字符串表示不限制球队
@@ -27,6 +27,7 @@
   CRAWLER_SELENIUM_READ_TIMEOUT  Python 与 chromedriver HTTP 读超时秒数（默认 240，须大于导航耗时）
   DATABASE_URL  与 fb-platform 相同（mysql+pymysql://...），供 evaluation_matches 入表/出表；未设置则跳过
 """
+import datetime
 import os
 
 
@@ -106,11 +107,18 @@ CHROMEDRIVER_PATH = (
     os.environ.get("CRAWLER_CHROMEDRIVER_PATH", "").strip()
     or os.environ.get("CHROMEDRIVER_PATH", "").strip()
 )
-# 日志目录：定时任务 stdout/stderr、调试导出的页面 HTML（debug_export_page_*.html）等
+# 日志根目录：实际文件写在 DEBUG_LOG_DIR/YYYYMMDD/ 下（见 dated_debug_log_dir）
 DEBUG_LOG_DIR = os.environ.get(
     "CRAWLER_DEBUG_LOG_DIR",
     os.path.join(WORK_SPACE, "fb-log")
 )
+
+
+def dated_debug_log_dir(log_root: str | None = None, day: datetime.date | None = None) -> str:
+    """返回 pipeline 当日日志目录：`<日志根>/YYYYMMDD/`。log_root 默认 DEBUG_LOG_DIR；day 默认今天。"""
+    root = DEBUG_LOG_DIR if log_root is None else log_root
+    d = datetime.date.today() if day is None else day
+    return os.path.join(root, d.strftime("%Y%m%d"))
 # 日志保留天数：crawl/merge_data/calc_car/plot_car 执行前会删除超过此天数的日志文件
 LOG_RETENTION_DAYS = int(os.environ.get("CRAWLER_LOG_RETENTION_DAYS", "7"))
 # 调试：最多抓取场数，0=不限制；设为 3 时只抓 3 场即结束，便于快速验证 run_real.py 全流程
