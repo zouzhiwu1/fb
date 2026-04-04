@@ -25,11 +25,12 @@ auth_bp = Blueprint("auth", __name__)
 
 
 def _create_token(user_id: int, session_version: int) -> str:
+    now = datetime.now()
     payload = {
         "sub": str(user_id),  # JWT 规范建议 sub 为字符串
         "sv": int(session_version),  # session version：用于踢掉旧登录
-        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
-        "iat": datetime.utcnow(),
+        "exp": now + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat": now,
     }
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return token if isinstance(token, str) else token.decode("utf-8")
@@ -96,7 +97,7 @@ def send_code():
     if not _is_valid_phone(phone):
         return jsonify({"ok": False, "message": "请输入 11 位有效手机号"}), 400
 
-    now = datetime.utcnow()
+    now = datetime.now()
     last = (
         VerificationCode.query.filter_by(phone=phone)
         .order_by(VerificationCode.created_at.desc())
@@ -151,7 +152,7 @@ def register():
     if not code:
         return jsonify({"ok": False, "message": "请输入验证码"}), 400
 
-    now = datetime.utcnow()
+    now = datetime.now()
     rec = (
         VerificationCode.query.filter_by(phone=phone, code=code)
         .filter(VerificationCode.used_at.is_(None))
@@ -224,7 +225,7 @@ def login():
     if not user:
         return jsonify({"ok": False, "message": "该手机号未注册"}), 404
 
-    now = datetime.utcnow()
+    now = datetime.now()
     if code:
         rec = (
             VerificationCode.query.filter_by(phone=phone, code=code)
@@ -367,7 +368,7 @@ def change_phone():
     if User.query.filter_by(phone=new_phone).first():
         return jsonify({"ok": False, "message": "该手机号已被其他账号使用"}), 409
 
-    now = datetime.utcnow()
+    now = datetime.now()
     rec = (
         VerificationCode.query.filter_by(phone=new_phone, code=code)
         .filter(VerificationCode.used_at.is_(None))

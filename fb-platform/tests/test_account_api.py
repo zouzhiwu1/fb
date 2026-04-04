@@ -157,7 +157,7 @@ def test_change_phone_success(platform_app, platform_client, user_with_password)
         rec = VerificationCode(
             phone=new_phone,
             code="654321",
-            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            expires_at=datetime.now() + timedelta(minutes=5),
         )
         db.session.add(rec)
         db.session.commit()
@@ -195,7 +195,7 @@ def test_change_phone_taken(platform_app, platform_client, user_with_password):
         rec = VerificationCode(
             phone=phone_b,
             code="888888",
-            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            expires_at=datetime.now() + timedelta(minutes=5),
         )
         db.session.add(rec)
         db.session.commit()

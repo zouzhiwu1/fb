@@ -21,7 +21,7 @@ def _parse_month_param(raw: str | None) -> str:
         s = raw.strip()
         if _YM_RE.match(s):
             return s
-    now = datetime.utcnow()
+    now = datetime.now()
     return f"{now.year:04d}-{now.month:02d}"
 
 

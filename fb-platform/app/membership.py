@@ -233,7 +233,7 @@ def grant_free_week(user_id: int) -> bool:
         order_id=None,
     )
     db.session.add(rec)
-    user.free_week_granted_at = datetime.utcnow()
+    user.free_week_granted_at = datetime.now()
     db.session.commit()
     return True
 

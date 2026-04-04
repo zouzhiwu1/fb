@@ -96,7 +96,7 @@ class DefaultMembershipFulfillment:
             order.status = "paid"
             if payment.provider_trade_id:
                 order.trade_no = payment.provider_trade_id
-            order.paid_at = datetime.utcnow()
+            order.paid_at = datetime.now()
             db.session.commit()
             logger.info("fulfill paid out_trade_no=%s user=%s", out_no, order.user_id)
             return FulfillOutcome(FulfillResult.OK_FULFILLED)

@@ -142,7 +142,7 @@ def _sync_agent_commission_lines(agent: Agent, ym: str) -> None:
             user_id=uid,
             username=_mask_phone(r.get("phone")),
             commission_type="registration",
-            created_at=r.get("created_at") or datetime.utcnow(),
+            created_at=r.get("created_at") or datetime.now(),
             reg_factor=reg_factor,
             commission_amount=Decimal(str(reg_factor)).quantize(Decimal("0.01")),
             payment_status="pending",
@@ -184,7 +184,7 @@ def _sync_agent_commission_lines(agent: Agent, ym: str) -> None:
             user_id=int(r["user_id"]),
             username=_mask_phone(r.get("phone")),
             commission_type="recharge",
-            created_at=r.get("paid_at") or datetime.utcnow(),
+            created_at=r.get("paid_at") or datetime.now(),
             payment_order_id=payment_order_id,
             recharge_amount=recharge_amount,
             rebate_rate=rebate_rate,
@@ -642,7 +642,7 @@ def settle_agent_commission(agent_id: int):
                 }
             ), 400
 
-        now = datetime.utcnow()
+        now = datetime.now()
         payout = PayoutOrder(
             order_id=f"PO{now.strftime('%Y%m%d%H%M%S')}{str(uuid.uuid4().hex[:6]).upper()}",
             agent_id=agent_id,

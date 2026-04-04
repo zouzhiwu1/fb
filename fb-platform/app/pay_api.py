@@ -138,7 +138,7 @@ def create_order():
 
     labels = {"week": "周会员", "month": "月会员", "quarter": "季会员", "year": "年会员"}
     subject = f"足球数据会员-{labels.get(mtype, mtype)}"
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d%H%M%S")
     rand = secrets.token_hex(3)
     out_trade_no = f"FB{user_id}{ts}{rand}"[:64]
 

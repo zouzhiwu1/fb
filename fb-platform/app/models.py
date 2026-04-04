@@ -15,8 +15,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=True)  # 新注册必填，兼容旧数据
     # 登录会话版本号：每次成功登录自增，旧 token 因版本不匹配而失效（单设备登录）
     session_version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     # 会员系统：是否已赠送过周会员（仅一次）
     free_week_granted_at = db.Column(db.DateTime, nullable=True)
 
@@ -41,7 +41,7 @@ class VerificationCode(db.Model):
     code = db.Column(db.String(10), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 
 class EvaluationMatch(db.Model):
@@ -75,7 +75,7 @@ class PaymentOrder(db.Model):
     subject = db.Column(db.String(256), nullable=False)
     status = db.Column(db.String(20), nullable=False, default="pending")  # pending / paid / closed
     trade_no = db.Column(db.String(64), nullable=True)  # 支付宝交易号
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     paid_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):

@@ -145,7 +145,7 @@ def require_root_only() -> Optional[Tuple[Any, int]]:
 
 
 def issue_partner_token(agent: Agent) -> str:
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     exp = now + datetime.timedelta(hours=_cfg.PARTNER_JWT_EXPIRE_HOURS)
     payload = {
         "sub_type": "partner",
@@ -163,7 +163,7 @@ def issue_partner_token(agent: Agent) -> str:
 
 
 def issue_admin_token(admin: PartnerAdmin) -> str:
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     exp = now + datetime.timedelta(hours=_cfg.PARTNER_JWT_EXPIRE_HOURS)
     payload = {
         "sub_type": "partner_admin",
@@ -182,7 +182,7 @@ def issue_admin_token(admin: PartnerAdmin) -> str:
 
 
 def issue_root_token() -> str:
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     exp = now + datetime.timedelta(hours=_cfg.PARTNER_JWT_EXPIRE_HOURS)
     payload = {
         "sub_type": "partner_admin",

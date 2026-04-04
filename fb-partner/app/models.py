@@ -15,7 +15,7 @@ class PartnerAdmin(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(16), nullable=False, default="active", index=True)
     session_version = db.Column(db.Integer, nullable=False, default=1)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
 
 class Agent(db.Model):
@@ -41,7 +41,7 @@ class Agent(db.Model):
     bank_info = db.Column(db.Text(), nullable=True)
     status = db.Column(db.String(16), nullable=False, default="active", index=True)
     session_version = db.Column(db.Integer, nullable=False, default=1)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     # 管理员线下打款后累计已结算服务费（元）
     settled_commission_yuan = db.Column(
         db.Numeric(14, 2), nullable=False, default=0
@@ -71,7 +71,7 @@ class AgentCommissionSettlement(db.Model):
     payment_reference = db.Column(db.String(256), nullable=True)
     payment_note = db.Column(db.Text(), nullable=True)
     amount_yuan = db.Column(db.Numeric(14, 2), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
 
 class PayoutOrder(db.Model):
@@ -88,7 +88,7 @@ class PayoutOrder(db.Model):
         index=True,
     )
     total_amount = db.Column(db.Numeric(14, 2), nullable=False)
-    paid_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    paid_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     paid_by_admin_id = db.Column(
         db.Integer,
         db.ForeignKey("partner_admins.id"),
@@ -98,11 +98,11 @@ class PayoutOrder(db.Model):
     payout_reference = db.Column(db.String(256), nullable=False)
     status = db.Column(db.String(16), nullable=False, default="paid", index=True)
     remark = db.Column(db.Text(), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=datetime.now,
+        onupdate=datetime.now,
         nullable=False,
     )
 
@@ -122,7 +122,7 @@ class AgentCommissionLine(db.Model):
     user_id = db.Column(db.Integer, nullable=False, index=True)
     username = db.Column(db.String(128), nullable=False, default="")
     commission_type = db.Column(db.String(16), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)
 
     # 拉新快照
     reg_factor = db.Column(db.Numeric(14, 4), nullable=True)
@@ -169,4 +169,4 @@ class PointsLedger(db.Model):
     settlement_month = db.Column(
         db.String(7), nullable=True, index=True
     )  # YYYY-MM
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)
