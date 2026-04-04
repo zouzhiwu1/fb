@@ -838,6 +838,8 @@ class ZhiyunScraper:
                 except Exception:
                     before_attempt = set()
 
+                # 与「新文件名」并列：智云等站点常固定导出同名 .xls（覆盖写入），须用 mtime ≥ 点击时刻 识别。
+                export_clicked_at = time.time()
                 try:
                     clicked = self.driver.execute_script("""
                         var el = document.getElementById('downobj');
@@ -886,6 +888,7 @@ class ZhiyunScraper:
                         before_attempt,
                         time_suffix,
                         log_if_no_new_file=(attempt == EXPORT_EXCEL_MAX_ATTEMPTS),
+                        since_export_time=export_clicked_at,
                     )
                 except Exception as move_err:
                     print(f"  移动下载文件失败: {move_err}", file=__import__("sys").stderr)
@@ -1024,33 +1027,44 @@ class ZhiyunScraper:
         time_suffix: str,
         *,
         log_if_no_new_file: bool = True,
+        since_export_time: float | None = None,
     ):
         """
-        在指定目录内等待新出现的 .xls 并重命名为 主队_VS_客队_{time_suffix}.xls（不跨目录移动）。
-        返回是否成功检测到新文件并完成命名；log_if_no_new_file=False 时未检测到文件不打 warning（用于重试中间次）。
+        在指定目录内等待 .xls 落盘并重命名为 主队_VS_客队_{time_suffix}.xls（不跨目录移动）。
+
+        除「目录里出现新文件名」外，若 since_export_time 已提供，则任一已有 .xls 在点击导出后
+        修改时间更新（同名覆盖）也会视为本次下载，避免智云固定文件名导致永远检测不到「新文件」。
         """
         try:
             wait_sec = max(0.05, float(EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS))
             poll = min(1.0, max(0.05, wait_sec / 10.0))
             deadline = time.time() + wait_sec
             new_path = None
+            mtime_slack = 2.0
 
             while time.time() < deadline:
+                candidates: list[tuple[str, float]] = []
                 try:
-                    current = [
-                        f
-                        for f in os.listdir(target_dir)
-                        if f.lower().endswith(".xls")
-                    ]
+                    for f in os.listdir(target_dir):
+                        if not f.lower().endswith(".xls"):
+                            continue
+                        path = os.path.join(target_dir, f)
+                        try:
+                            m = os.path.getmtime(path)
+                        except OSError:
+                            continue
+                        new_filename = f not in before_files
+                        same_file_refreshed = (
+                            since_export_time is not None
+                            and m >= since_export_time - mtime_slack
+                        )
+                        if new_filename or same_file_refreshed:
+                            candidates.append((path, m))
                 except Exception:
                     time.sleep(poll)
                     continue
-                added = [f for f in current if f not in before_files]
-                if added:
-                    candidates = [
-                        os.path.join(target_dir, f) for f in added
-                    ]
-                    new_path = max(candidates, key=os.path.getmtime)
+                if candidates:
+                    new_path = max(candidates, key=lambda x: x[1])[0]
                     break
                 time.sleep(poll)
 
