@@ -4,3 +4,8 @@ fb_common/__init__.py
 fb_common/env.py
 fb_common/mysql.py
 fb_common/password_policy.py
+fb_common.egg-info/PKG-INFO
+fb_common.egg-info/SOURCES.txt
+fb_common.egg-info/dependency_links.txt
+fb_common.egg-info/requires.txt
+fb_common.egg-info/top_level.txt

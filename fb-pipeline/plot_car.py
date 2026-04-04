@@ -44,10 +44,11 @@ COL_KELLY_MAIN, COL_KELLY_DRAW, COL_KELLY_AWAY = 9, 10, 11
 CAR_HEADER_ROWS = 2
 NUM_COLUMNS = 12
 
-# 子图轴文案（Unicode 转义，避免源码出现明文「kaili指数」等）
+# 子图轴文案（\uXXXX Unicode 转义，与凯利子图一致，避免编码/字体下标题显示异常）
 PLOT_TIME_XLABEL = "\u65f6\u95f4\u70b9"
 PLOT_KELLY_YLABEL = "\u51ef\u5229\u6307\u6570"
 PLOT_KELLY_TITLE = "\u51ef\u5229\u6307\u6570\u66f2\u7ebf\u56fe"
+PLOT_OUPEI_TITLE = "oupei\u6307\u6570\u66f2\u7ebf\u56fe"
 
 
 def _setup_logging():
@@ -257,7 +258,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         ax1.set_xticklabels(x_labels, rotation=45, ha="right")
         ax1.tick_params(axis="both", labelsize=17)
         ax1.set_ylabel("评估值", fontsize=17)
-        ax1.set_title("oupei指数曲线图", fontsize=20)
+        ax1.set_title(PLOT_OUPEI_TITLE, fontsize=20)
         ax1.legend(loc="best", fontsize=13)
         ax1.grid(True, alpha=0.3)
 
