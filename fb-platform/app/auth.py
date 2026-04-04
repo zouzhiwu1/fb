@@ -2,7 +2,7 @@
 """
 认证相关 API：发送验证码、注册、登录。
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import jwt
 from flask import Blueprint, request, jsonify
@@ -25,7 +25,8 @@ auth_bp = Blueprint("auth", __name__)
 
 
 def _create_token(user_id: int, session_version: int) -> str:
-    now = datetime.now()
+    # iat/exp 须为 UTC 瞬时配合 PyJWT；naive 本地时间会被误当成 UTC，导致校验失败（如 iat 尚未生效）。
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),  # JWT 规范建议 sub 为字符串
         "sv": int(session_version),  # session version：用于踢掉旧登录
