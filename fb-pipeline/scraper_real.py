@@ -6,7 +6,7 @@
 下载方式：
 - 使用 Selenium 进入「足球 → 即时比分 → zucai → beidan」，等待表格刷新；
 - 按 config：可视过滤 MATCH_FILTER_VISIBLE_ONLY、状态过滤 MATCH_STATUS_MODES、联赛白名单 TARGET_LEAGUE_NAMES；
-- 对每场状态为空的比赛，点击行内的「欧」链接，打开详情页；
+- 对每场状态为空的比赛，用列表行点「欧」打开详情；在详情/1x2 页解析主客字段后，判断是否分别包含列表中的主队名、客队名（子串匹配；前面可带联赛、后可带栏目字样）后再导出；不符或点行失效则全表重定位并重试，最多 OPEN_DETAIL_VERIFY_MAX_ATTEMPTS 次；
 - 在详情页中点击「导出Excel」按钮，由浏览器下载 .xls；
 - 将 .xls 文件重命名为「主队_VS_客队_{YYYYMMDDHH}.xls」。
 """
@@ -14,6 +14,7 @@ import os
 import re
 import time
 import logging
+import unicodedata
 from datetime import datetime, timedelta
 from urllib.parse import urljoin
 
@@ -27,6 +28,7 @@ from selenium.common.exceptions import (
     NoSuchWindowException,
     ElementNotInteractableException,
     ElementClickInterceptedException,
+    StaleElementReferenceException,
 )
 
 from league_whitelist import league_matches_whitelist
@@ -59,6 +61,10 @@ from config import (
     EXPORT_EXCEL_MAX_ATTEMPTS,
     EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS,
 )
+
+# 打开详情/1x2 页后与列表期望队名不符、或点击/开窗异常时，全表重定位并重试的上限（含首次点击）。
+OPEN_DETAIL_VERIFY_MAX_ATTEMPTS = 3
+
 
 def _now_in_tz():
     """返回本机当前时间（本地时区），用于下载目录/文件名。"""
@@ -403,135 +409,311 @@ class ZhiyunScraper:
                 raise
         return []
 
+    def _normalize_team_for_page_compare(self, name: str) -> str:
+        """列表/详情对比用：去 (主)/(客)、NFKC、压缩空白。"""
+        s = unicodedata.normalize("NFKC", (name or "").strip())
+        s = re.sub(r"\s*\((主|客|中)\)\s*", "", s)
+        return " ".join(s.split())
+
+    def _detail_page_teams_match_expected(
+        self, expected_home: str, expected_away: str, page_home: str | None, page_away: str | None
+    ) -> bool:
+        """详情页解析出的主、客字符串是否分别包含列表中的主队名、客队名（规范化后子串判断）。"""
+        if not page_home or not page_away:
+            return False
+        eh = self._normalize_team_for_page_compare(expected_home)
+        ea = self._normalize_team_for_page_compare(expected_away)
+        ph = self._normalize_team_for_page_compare(page_home)
+        pa = self._normalize_team_for_page_compare(page_away)
+        if not eh or not ea:
+            return False
+        return eh in ph and ea in pa
+
+    def _parse_teams_from_title(self, title: str) -> tuple[str | None, str | None]:
+        if not (title or "").strip():
+            return None, None
+        t = unicodedata.normalize("NFKC", title.strip())
+        # 全角ＶＳ
+        t = t.replace("ＶＳ", "VS").replace("ｖｓ", "vs")
+        for sep in (" VS ", " vs ", "VS", "vs", "－", "—"):
+            if sep not in t:
+                continue
+            idx = t.find(sep)
+            raw_home = t[:idx].strip()
+            raw_away = t[idx + len(sep) :].strip()
+            # 站点后缀：「- 智云比分」「_百家欧指」等，先按分隔取左段再剥栏目名
+            raw_away = re.split(r"[-_|]", raw_away, maxsplit=1)[0].strip()
+            parts = re.split(r"[-_]", raw_home)
+            home_guess = parts[-1].strip() if parts else raw_home
+            if home_guess and raw_away and len(home_guess) >= 2 and len(raw_away) >= 2:
+                return home_guess, raw_away
+        head = re.split(r"[-_]", t, maxsplit=1)[0].strip()
+        for sep in (" VS ", " vs ", "VS", "vs", "－", "—"):
+            if sep in head:
+                a, b = head.split(sep, 1)
+                ah, aw = a.strip(), b.strip()
+                if ah and aw:
+                    return ah, aw
+        return None, None
+
+    def _read_detail_page_teams(self) -> tuple[str | None, str | None]:
+        """在已切换到的详情/百家欧指页读取主客名称；失败返回 (None, None)。"""
+        try:
+            t = (self.driver.title or "").strip()
+            th, ta = self._parse_teams_from_title(t)
+            if th and ta:
+                return th, ta
+        except Exception:
+            pass
+        try:
+            raw = self.driver.execute_script(
+                "return (document.body && document.body.innerText) ? document.body.innerText : ''"
+            ) or ""
+        except Exception:
+            raw = ""
+        raw_n = " ".join(raw.split())[:3000]
+        m = re.search(
+            r"([\u4e00-\u9fffA-Za-z0-9·．.\s]{1,45}?)\(主\)\s*([\u4e00-\u9fffA-Za-z0-9·．.\s]{1,45}?"
+            r")(?=\s|\(|VS|vs|百家|欧指|亚指|大小|统计|$)",
+            raw_n,
+        )
+        if m:
+            h, a = m.group(1).strip(), m.group(2).strip()
+            if h and a:
+                return h, a
+        for sep in (" VS ", " vs ", "VS", "vs"):
+            if sep in raw_n[:800]:
+                chunk = raw_n[:800]
+                before, _, after = chunk.partition(sep)
+                if len(before) > 80 or len(after) > 80:
+                    continue
+                ah = before.strip().split()[-1] if before.strip() else ""
+                aw = after.strip().split()[0] if after.strip() else ""
+                if len(ah) >= 2 and len(aw) >= 2:
+                    return ah, aw
+        return None, None
+
     def _download_excel_for_row(self, wait, row, index, home, away, time_suffix=None):
         """点击当前行的「欧」链接（列表页为「析亚欧」），弹出详情页后点击「导出Excel」下载，再关闭弹窗。"""
-        # 页面可能在循环中动态刷新；导出前按主客队重新定位一次行，避免点到错场次。
-        refreshed_row = self._find_row_by_teams(home, away)
-        if refreshed_row is not None:
-            row = refreshed_row
-
-        link = self._pick_europe_link(row)
-        if not link:
-            row_preview = self._preview_row(row)
-            print(f"第 {index} 场比赛未找到「欧」链接，跳过。该行前几列: {row_preview}")
+        if not self._ensure_valid_window():
+            print(f"第 {index} 场 {home} vs {away}：无有效窗口，无法下载")
             return
-
-        # 优先尝试直接用「欧」链接的 href 打开 1x2 页面；若 href 无效（空或 javascript），则只点击「欧」让站点自己弹出窗口。
-        target_href = (link.get_attribute("href") or "").strip()
-        href_lower = target_href.lower()
-        use_direct_href = (
-            bool(target_href)
-            and not target_href.startswith("javascript:")
-            and target_href != "#"
-            and "sclass.aspx" not in href_lower
-        )
-        if use_direct_href:
-            # 补全协议相对链接
-            if target_href.startswith("//"):
-                target_href = "https:" + target_href
-            try:
-                original_window = self.driver.current_window_handle
-            except NoSuchWindowException:
-                if not self._ensure_valid_window():
-                    print(f"第 {index} 场 {home} vs {away}：无有效窗口，无法下载")
-                    return
-                original_window = self.driver.current_window_handle
-            existing_windows = set(self.driver.window_handles)
-            try:
-                self.driver.execute_script("window.open(arguments[0], '_blank');", target_href)
-            except Exception as e:
-                print(f"第 {index} 场 {home} vs {away}：无法打开 1x2 链接 {target_href}：{e}")
+        try:
+            original_window = self.driver.current_window_handle
+        except NoSuchWindowException:
+            if not self._ensure_valid_window():
+                print(f"第 {index} 场 {home} vs {away}：无有效窗口，无法下载")
                 return
-        else:
-            # href 为空 / javascript / Sclass 联赛链接时，直接点击元素，交给站点 onclick 打开比赛详情页
-            try:
-                original_window = self.driver.current_window_handle
-            except NoSuchWindowException:
-                if not self._ensure_valid_window():
-                    print(f"第 {index} 场 {home} vs {away}：无有效窗口，无法下载")
-                    return
-                original_window = self.driver.current_window_handle
-            existing_windows = set(self.driver.window_handles)
-            self._scroll_into_view_and_click(link)
+            original_window = self.driver.current_window_handle
 
-        def _find_new_window(d):
-            handles = set(d.window_handles)
-            handles.difference_update(existing_windows)
-            return handles.pop() if len(handles) == 1 else None
+        new_handle = None
+        open_ok = False
 
-        try:
-            new_handle = WebDriverWait(self.driver, WAIT_ELEMENT).until(_find_new_window)
-        except TimeoutException:
-            print(f"第 {index} 场 {home} vs {away}：未发现新窗口，跳过")
-            return
-
-        if not new_handle:
-            print(f"第 {index} 场 {home} vs {away}：新窗口句柄为空，跳过")
-            return
-
-        try:
-            self.driver.switch_to.window(new_handle)
-            try:
-                WebDriverWait(self.driver, WAIT_ELEMENT).until(
-                    EC.presence_of_element_located((By.TAG_NAME, "body"))
-                )
-            except Exception:
-                pass
-
-            self._wait_page_loaded()
-
-            # 若当前页为盘路/资料库页，尝试跳转到对应的 1x2 百家欧指页面
-            try:
-                href_1x2 = None
-                # 顶部菜单里的「百家欧指」
+        for open_attempt in range(1, OPEN_DETAIL_VERIFY_MAX_ATTEMPTS + 1):
+            row_to_use = row
+            if open_attempt > 1:
                 try:
-                    menu_link = self.driver.find_element(By.XPATH, "//table[@id='tb_menus']//a[contains(@href,'/1x2/')]")
-                    href_1x2 = (menu_link.get_attribute('href') or '').strip()
+                    self.driver.switch_to.window(original_window)
                 except Exception:
+                    if not self._ensure_valid_window():
+                        print(f"第 {index} 场 {home} vs {away}：列表窗口丢失，跳过")
+                        return
+                    original_window = self.driver.current_window_handle
+                refreshed = self._find_row_by_teams(home, away)
+                if refreshed is None:
+                    continue
+                row_to_use = refreshed
+
+            try:
+                link = self._pick_europe_link(row_to_use)
+            except StaleElementReferenceException:
+                continue
+            if not link:
+                try:
+                    row_preview = self._preview_row(row_to_use)
+                except Exception:
+                    row_preview = "(无法预览)"
+                if open_attempt == OPEN_DETAIL_VERIFY_MAX_ATTEMPTS:
+                    print(
+                        f"第 {index} 场比赛未找到「欧」链接，跳过。该行前几列: {row_preview}"
+                    )
+                continue
+
+            existing_windows = set(self.driver.window_handles)
+            target_href = ""
+            try:
+                target_href = (link.get_attribute("href") or "").strip()
+            except StaleElementReferenceException:
+                continue
+            href_lower = target_href.lower()
+            use_direct_href = (
+                bool(target_href)
+                and not target_href.startswith("javascript:")
+                and target_href != "#"
+                and "sclass.aspx" not in href_lower
+            )
+
+            if use_direct_href:
+                if target_href.startswith("//"):
+                    target_href = "https:" + target_href
+                try:
+                    self.driver.execute_script("window.open(arguments[0], '_blank');", target_href)
+                except StaleElementReferenceException:
+                    continue
+                except Exception as e:
+                    if open_attempt == OPEN_DETAIL_VERIFY_MAX_ATTEMPTS:
+                        print(
+                            f"第 {index} 场 {home} vs {away}：无法打开 1x2 链接 {target_href}：{e}"
+                        )
+                    continue
+            else:
+                try:
+                    self._scroll_into_view_and_click(link)
+                except StaleElementReferenceException:
+                    continue
+                except Exception as e:
+                    if open_attempt == OPEN_DETAIL_VERIFY_MAX_ATTEMPTS:
+                        print(
+                            f"第 {index} 场 {home} vs {away}：点击「欧」异常：{e}"
+                        )
+                    continue
+
+            def _find_new_window(d):
+                handles = set(d.window_handles)
+                handles.difference_update(existing_windows)
+                return handles.pop() if len(handles) == 1 else None
+
+            try:
+                new_handle = WebDriverWait(self.driver, WAIT_ELEMENT).until(_find_new_window)
+            except TimeoutException:
+                if open_attempt == OPEN_DETAIL_VERIFY_MAX_ATTEMPTS:
+                    print(f"第 {index} 场 {home} vs {away}：未发现新窗口，跳过")
+                new_handle = None
+                continue
+
+            if not new_handle:
+                if open_attempt == OPEN_DETAIL_VERIFY_MAX_ATTEMPTS:
+                    print(f"第 {index} 场 {home} vs {away}：新窗口句柄为空，跳过")
+                continue
+
+            try:
+                self.driver.switch_to.window(new_handle)
+                try:
+                    WebDriverWait(self.driver, WAIT_ELEMENT).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
+                    )
+                except Exception:
+                    pass
+
+                self._wait_page_loaded()
+
+                # 若当前页为盘路/资料库页，尝试跳转到对应的 1x2 百家欧指页面
+                try:
                     href_1x2 = None
-                # 资料库页中指向 live.nowscore.com/1x2 的链接
-                if not href_1x2:
-                    for a in self.driver.find_elements(By.XPATH, "//a[contains(@href,'1x2')]"):
-                        h = (a.get_attribute('href') or '').strip()
-                        if h and '1x2' in h:
-                            href_1x2 = h
-                            break
-                if href_1x2:
-                    cur = (self.driver.current_url or '').strip()
-                    if href_1x2.startswith('//'):
-                        goto_url = 'https:' + href_1x2
-                    elif href_1x2.startswith('/'):
-                        goto_url = urljoin(cur, href_1x2)
-                    else:
-                        goto_url = href_1x2
+                    try:
+                        menu_link = self.driver.find_element(
+                            By.XPATH, "//table[@id='tb_menus']//a[contains(@href,'/1x2/')]"
+                        )
+                        href_1x2 = (menu_link.get_attribute("href") or "").strip()
+                    except Exception:
+                        href_1x2 = None
+                    if not href_1x2:
+                        for a in self.driver.find_elements(By.XPATH, "//a[contains(@href,'1x2')]"):
+                            h = (a.get_attribute("href") or "").strip()
+                            if h and "1x2" in h:
+                                href_1x2 = h
+                                break
+                    if href_1x2:
+                        cur = (self.driver.current_url or "").strip()
+                        if href_1x2.startswith("//"):
+                            goto_url = "https:" + href_1x2
+                        elif href_1x2.startswith("/"):
+                            goto_url = urljoin(cur, href_1x2)
+                        else:
+                            goto_url = href_1x2
+                        if goto_url:
+                            self.driver.get(goto_url)
+                            WebDriverWait(self.driver, WAIT_ELEMENT).until(
+                                EC.presence_of_element_located((By.TAG_NAME, "body"))
+                            )
+                            self._wait_page_loaded()
+                except Exception:
+                    pass
+
+                current_url = (self.driver.current_url or "").lower()
+                if "info.nowscore.com" in current_url:
+                    goto_url = None
+                    for a in self.driver.find_elements(
+                        By.XPATH, "//a[contains(@href,'live.nowscore.com') and contains(@href,'1x2')]"
+                    ):
+                        try:
+                            h = (a.get_attribute("href") or "").strip()
+                            if h and "1x2" in h:
+                                goto_url = "https:" + h if h.startswith("//") else h
+                                break
+                        except Exception:
+                            continue
                     if goto_url:
                         self.driver.get(goto_url)
                         WebDriverWait(self.driver, WAIT_ELEMENT).until(
-                            EC.presence_of_element_located((By.TAG_NAME, 'body'))
+                            EC.presence_of_element_located((By.TAG_NAME, "body"))
                         )
                         self._wait_page_loaded()
-            except Exception:
-                pass
 
-            # 若被重定向到 info.nowscore.com 等资料库页，仍然再兜底找一次 1x2 链接
-            current_url = (self.driver.current_url or '').lower()
-            if 'info.nowscore.com' in current_url:
-                goto_url = None
-                for a in self.driver.find_elements(By.XPATH, "//a[contains(@href,'live.nowscore.com') and contains(@href,'1x2')]"):
+                det_home, det_away = self._read_detail_page_teams()
+                if not self._detail_page_teams_match_expected(home, away, det_home, det_away):
                     try:
-                        h = (a.get_attribute('href') or '').strip()
-                        if h and '1x2' in h:
-                            goto_url = 'https:' + h if h.startswith('//') else h
-                            break
+                        self.driver.close()
                     except Exception:
-                        continue
-                if goto_url:
-                    self.driver.get(goto_url)
-                    WebDriverWait(self.driver, WAIT_ELEMENT).until(
-                        EC.presence_of_element_located((By.TAG_NAME, 'body'))
-                    )
-                    self._wait_page_loaded()
+                        pass
+                    try:
+                        self.driver.switch_to.window(original_window)
+                    except Exception:
+                        if not self._ensure_valid_window():
+                            print(f"第 {index} 场 {home} vs {away}：列表窗口丢失，跳过")
+                            return
+                        original_window = self.driver.current_window_handle
+                    new_handle = None
+                    continue
 
+                open_ok = True
+                break
+            except StaleElementReferenceException:
+                try:
+                    self.driver.close()
+                except Exception:
+                    pass
+                try:
+                    self.driver.switch_to.window(original_window)
+                except Exception:
+                    if not self._ensure_valid_window():
+                        print(f"第 {index} 场 {home} vs {away}：列表窗口丢失，跳过")
+                        return
+                    original_window = self.driver.current_window_handle
+                new_handle = None
+                continue
+            except Exception:
+                try:
+                    self.driver.close()
+                except Exception:
+                    pass
+                try:
+                    self.driver.switch_to.window(original_window)
+                except Exception:
+                    if not self._ensure_valid_window():
+                        print(f"第 {index} 场 {home} vs {away}：列表窗口丢失，跳过")
+                        return
+                    original_window = self.driver.current_window_handle
+                new_handle = None
+                continue
+
+        if not open_ok:
+            print(
+                f"第 {index} 场 {home} vs {away}：打开详情或核对队名失败，已跳过"
+            )
+            return
+
+        try:
             # 之前尝试过在详情页直接拼出 ExportExcelNew.aspx 的 URL 再用 requests 下载，
             # 但实际运行中返回了站内 404 页面（虽然 HTTP 状态码为 200），导致保存的 xls 无法打开。
             # 为保证数据正确性，这里暂时停用该优化，统一回退到浏览器点击「导出Excel」的稳定方案。
@@ -695,21 +877,21 @@ class ZhiyunScraper:
                         file=__import__("sys").stderr,
                     )
 
+                rename_ok = False
                 try:
-                    if self._rename_latest_download_in_dir(
+                    rename_ok = self._rename_latest_download_in_dir(
                         home,
                         away,
                         target_dir,
                         before_attempt,
                         time_suffix,
                         log_if_no_new_file=(attempt == EXPORT_EXCEL_MAX_ATTEMPTS),
-                    ):
-                        saved = True
-                        break
+                    )
                 except Exception as move_err:
                     print(f"  移动下载文件失败: {move_err}", file=__import__("sys").stderr)
 
-                if saved:
+                if rename_ok:
+                    saved = True
                     break
                 if attempt < EXPORT_EXCEL_MAX_ATTEMPTS:
                     log.info(
@@ -747,7 +929,10 @@ class ZhiyunScraper:
     def _find_row_by_teams(self, home: str, away: str):
         """按主队/客队在当前可见列表里重新定位比赛行；找不到时返回 None。"""
         try:
-            rows = self._collect_match_rows(WebDriverWait(self.driver, WAIT_ELEMENT), visible_only=MATCH_FILTER_VISIBLE_ONLY)
+            rows = self._collect_match_rows(
+                WebDriverWait(self.driver, WAIT_ELEMENT),
+                visible_only=MATCH_FILTER_VISIBLE_ONLY,
+            )
         except Exception:
             return None
 
