@@ -50,11 +50,11 @@ PARTNER_ROOT_SESSION_VERSION = int(
 PARTNER_YUAN_PER_VALID_REGISTRATION = float(
     os.environ.get("PARTNER_YUAN_PER_VALID_REGISTRATION", "100")
 )
-# 佣金：积分 × 系数（文档默认 1 积分 = 1 元）
+# 服务费：积分 × 系数（文档默认 1 积分 = 1 元）
 PARTNER_COMMISSION_PER_POINT = float(
     os.environ.get("PARTNER_COMMISSION_PER_POINT", "1")
 )
-# 拉新佣金系数（用于 registration 明细行快照与金额计算）
+# 拉新服务费系数（用于 registration 明细行快照与金额计算）
 PARTNER_REG_FACTOR = float(
     os.environ.get("PARTNER_REG_FACTOR", "1")
 )

@@ -7,7 +7,7 @@
 <div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
 <p class="row-actions" style="margin-top:20px;">
   <a class="text-link" href="{{ partner_url_prefix }}/admin/agents">返回一览</a>
-  <a class="text-link" id="link_board" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/commission">佣金</a>
+  <a class="text-link" id="link_board" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/commission">服务费</a>
   <a class="text-link" id="link_edit" href="{{ partner_url_prefix }}/admin/agents/{{ agent_id }}/edit">修改</a>
 </p>
 {% endblock %}
@@ -40,7 +40,7 @@
     h += '<dt>支付渠道</dt><dd>' + esc(pch) + '</dd>';
     h += '<dt>支付账号</dt><dd>' + esc(a.payout_account || '—') + '</dd>';
     h += '<dt>收款真实姓名</dt><dd>' + esc(a.payout_holder_name || '—') + '</dd>';
-    h += '<dt>本月返点率</dt><dd>' + esc(a.current_rate) + '</dd>';
+    h += '<dt>本月分润率</dt><dd>' + esc(a.current_rate) + '</dd>';
     h += '<dt>状态</dt><dd>' + esc(a.status) + '</dd>';
     h += '<dt>创建时间</dt><dd>' + esc(a.created_at || '—') + '</dd>';
     h += '</dl>';

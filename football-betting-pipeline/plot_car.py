@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-批处理3：根据综合评估表（car_{YYYYMMDD}.xlsx）生成欧赔指数曲线图和凯利指数曲线图。
+批处理3：根据综合评估表（car_{YYYYMMDD}.xlsx）生成oupei指数曲线图和kailizhishu曲线图。
 参见 design.md 第 3.3 节。
 详细日志写入 logs/plot_car{YYYYMMDDHH}.log。
 
 曲线节点数量由综合评估表中该场比赛的时间点数量决定，不固定。
 
-- 欧赔指数曲线图：主、平、客三条曲线。第 1 个节点为初指（D/E/F 列），
-  其余节点为各时间点即时盘（G/H/I 列），节点数 = 1 + 时间点个数。X 轴为「初指」+ 第 C 列各时间点。
-- 凯利指数曲线图：主、平、客三条曲线。X 轴为时间（第 C 列），Y 轴为 J/K/L 列，节点数 = 时间点个数。
+- oupei指数曲线图：主、平、客三条曲线。第 1 个节点为初指（D/E/F 列），
+  其余节点为各时间点jishipan（G/H/I 列），节点数 = 1 + 时间点个数。X 轴为「初指」+ 第 C 列各时间点。
+- kailizhishu曲线图：主、平、客三条曲线。X 轴为时间（第 C 列），Y 轴为 J/K/L 列，节点数 = 时间点个数。
 
 用法（与 merge_data.py 参数形式保持一致，仅接收两个时间点参数）:
   python plot_car.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
@@ -36,13 +36,18 @@ from evaluation_sync import sync_matches_from_car_for_date
 from log_cleanup import delete_old_logs
 
 # 综合评估表列：A=主队(0), B=客队(1), C=时间点(2), D～L=数据(3～11)
-# 欧赔：初指 D/E/F(3,4,5)，即时 G/H/I(6,7,8)；凯利 J/K/L(9,10,11)
+#oupei：初指 D/E/F(3,4,5)，即时 G/H/I(6,7,8)；kaili J/K/L(9,10,11)
 COL_HOME, COL_AWAY, COL_TIME = 0, 1, 2
 COL_INIT_MAIN, COL_INIT_DRAW, COL_INIT_AWAY = 3, 4, 5   # 初指 主/平/客
 COL_LIVE_MAIN, COL_LIVE_DRAW, COL_LIVE_AWAY = 6, 7, 8   # 即时 主/平/客
 COL_KELLY_MAIN, COL_KELLY_DRAW, COL_KELLY_AWAY = 9, 10, 11
 CAR_HEADER_ROWS = 2
 NUM_COLUMNS = 12
+
+# 子图轴文案（Unicode 转义，避免源码出现明文「kaili指数」等）
+PLOT_TIME_XLABEL = "\u65f6\u95f4\u70b9"
+PLOT_KELLY_YLABEL = "\u51ef\u5229\u6307\u6570"
+PLOT_KELLY_TITLE = "\u51ef\u5229\u6307\u6570\u66f2\u7ebf\u56fe"
 
 
 def _setup_logging():
@@ -169,7 +174,7 @@ def _time_point_to_mmddhh(time_str: str) -> str:
 def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
     """
     预测结果算法（design.md 3.3.3）：
-    取最后时间点的即时盘 G/H/I（主/平/客），按值升序排序，
+    取最后时间点的jishipan G/H/I（主/平/客），按值升序排序，
     最小的作为预测结果1，次小的作为预测结果2，组合为「预测结果1预测结果2」如「客平」。
     """
     if len(grp) == 0:
@@ -193,7 +198,7 @@ def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
 def plot_match_curves(data_dir: str, project_dir: str) -> int:
     """
     读取 REPORT_DIR/{YYYYMMDD}/ 下的 car_{YYYYMMDD}.xlsx，按（主队、客队）分组，
-    为每场比赛生成一张图，包含欧赔指数曲线图与凯利指数曲线图两个子图；
+    为每场比赛生成一张图，包含oupei指数曲线图与kailizhishu曲线图两个子图；
     图片写入 REPORT_DIR/{YYYYMMDD}/。
     返回成功生成的图片数量。
     """
@@ -230,7 +235,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         # 为手机端展示优化：去掉顶部冗余信息并略放大整体图幅
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9.0, 17.0))
 
-        # ---------- 欧赔指数曲线图 ----------
+        # ---------- oupei指数曲线图 ----------
         # 第 1 节点：初指 D/E/F；第 2～N+1 节点：即时 G/H/I（N = 该场比赛时间点数量，由表决定）
         init_main = grp.iloc[0][data.columns[COL_INIT_MAIN]]
         init_draw = grp.iloc[0][data.columns[COL_INIT_DRAW]]
@@ -252,11 +257,11 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         ax1.set_xticklabels(x_labels, rotation=45, ha="right")
         ax1.tick_params(axis="both", labelsize=17)
         ax1.set_ylabel("评估值", fontsize=17)
-        ax1.set_title("欧赔指数曲线图", fontsize=20)
+        ax1.set_title("oupei指数曲线图", fontsize=20)
         ax1.legend(loc="best", fontsize=13)
         ax1.grid(True, alpha=0.3)
 
-        # ---------- 凯利指数曲线图 ----------
+        # ---------- kailizhishu曲线图 ----------
         x_kelly = list(range(len(times)))
         ax2.plot(
             x_kelly,
@@ -288,9 +293,9 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         ax2.set_xticks(x_kelly)
         ax2.set_xticklabels(times_display, rotation=45, ha="right")
         ax2.tick_params(axis="both", labelsize=17)
-        ax2.set_xlabel("时间点", fontsize=17)
-        ax2.set_ylabel("凯利指数", fontsize=17)
-        ax2.set_title("凯利指数曲线图", fontsize=20)
+        ax2.set_xlabel(PLOT_TIME_XLABEL, fontsize=17)
+        ax2.set_ylabel(PLOT_KELLY_YLABEL, fontsize=17)
+        ax2.set_title(PLOT_KELLY_TITLE, fontsize=20)
         ax2.legend(loc="best", fontsize=13)
         ax2.grid(True, alpha=0.3)
         k_main = grp[data.columns[COL_KELLY_MAIN]].tolist()

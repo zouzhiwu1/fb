@@ -259,7 +259,7 @@ def test_admin_agents_pages_have_ui(client):
     r = client.get("/admin/agents")
     assert r.status_code == 200
     t = r.get_data(as_text=True)
-    assert "代理商一览" in t and "查看" in t and "修改" in t and "佣金" in t
+    assert "代理商一览" in t and "查看" in t and "修改" in t and "服务费" in t
     r2 = client.get("/admin/agents/new")
     assert r2.status_code == 200
     assert "注册代理商" in r2.get_data(as_text=True)
@@ -312,7 +312,7 @@ def test_admin_agent_monthly_board_api(client, app):
     r4 = client.get("/admin/agents/%s/commission" % aid)
     assert r4.status_code == 200
     t4 = r4.get_data(as_text=True)
-    assert "佣金" in t4 and "结算佣金" in t4
+    assert "服务费" in t4 and "结算服务费" in t4
 
     r5 = client.get("/admin/agents/%s/dashboard" % aid, follow_redirects=False)
     assert r5.status_code == 302

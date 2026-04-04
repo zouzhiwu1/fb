@@ -54,10 +54,10 @@
 
 <div id="kpi" class="kpi-grid"></div>
 
-<h2 class="section">佣金明细</h2>
+<h2 class="section">服务费明细</h2>
 <div class="table-wrap card" style="margin-top:0;padding:0;">
   <table class="dash" id="tbl_commission">
-    <thead><tr><th>用户名</th><th>佣金类型</th><th>佣金（元）</th><th>备注</th><th>日期时间</th><th>支付状态</th><th>支付日期时间</th></tr></thead>
+    <thead><tr><th>用户名</th><th>服务费类型</th><th>服务费（元）</th><th>备注</th><th>日期时间</th><th>支付状态</th><th>支付日期时间</th></tr></thead>
     <tbody id="tbody_commission"><tr><td colspan="7" class="muted">请选择月份并查询</td></tr></tbody>
   </table>
 </div>
@@ -107,10 +107,10 @@
     var cells = [
       { k: '总业绩（元）', v: s.performance_total_yuan != null ? s.performance_total_yuan : '—' },
       { k: '积分（核算）', v: s.points != null ? s.points : '—' },
-      { k: '佣金（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
+      { k: '服务费（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
       { k: '已结算金额', v: s.settled_commission_yuan != null ? (s.settled_commission_yuan + ' 元') : '—', muted: true },
       { k: '本月流水积分', v: s.points_ledger_month != null ? s.points_ledger_month : '—' },
-      { k: '返点率', v: pct + '%' },
+      { k: '分润率', v: pct + '%' },
       { k: '拉新业绩（元）', v: s.performance_reg_yuan },
       { k: '充值业绩（元）', v: s.performance_recharge_yuan }
     ];
@@ -138,7 +138,7 @@
       renderKpi(s);
       var tb = document.getElementById('tbody_commission');
       if (!j.commission_lines || !j.commission_lines.length) {
-        tb.innerHTML = '<tr><td colspan="7" class="muted">本月暂无佣金明细</td></tr>';
+        tb.innerHTML = '<tr><td colspan="7" class="muted">本月暂无服务费明细</td></tr>';
       } else {
         tb.innerHTML = j.commission_lines.map(function (r) {
           return '<tr>'

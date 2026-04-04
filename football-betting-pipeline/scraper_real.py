@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-智云比分网 竞足/beidan/14场 比赛列表爬虫。
+智云比分网 jingzu/beidan/14chang 比赛列表爬虫。
 逻辑与 Java 版 ZhiyunScraperService 一致。
 
 下载方式：
@@ -39,6 +39,9 @@ from config import (
     DEBUG_MAX_MATCHES,
     TEAM_WHITELIST_KEYWORDS,
     ZUCAI_MENU_OPTIONS,
+    ZUCAI_BEIDAN_LINK_TEXT,
+    ZUCAI_JINGZU_LINK_TEXT,
+    ZUCAI_PARENT_LINK_TEXT,
     MATCH_FILTER_VISIBLE_ONLY,
     MATCH_REQUIRE_JIAN,
     TARGET_LEAGUE_NAMES,
@@ -100,7 +103,7 @@ class ZhiyunScraper:
         live_tab = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "即时比分")))
         self._scroll_into_view_and_click(live_tab)
 
-        # 3) 对 竞足、beidan、14场 分别处理（当前配置里只保留了「beidan」）
+        # 3) 对 jingzu、beidan、14场 分别处理（当前配置里只保留了「beidan」）
         for menu_option in ZUCAI_MENU_OPTIONS:
             log.info("========== 获取 [%s] 比赛列表 ==========", menu_option)
             first_row_home_before = self._get_first_data_row_home_team()
@@ -204,7 +207,9 @@ class ZhiyunScraper:
 
     def _hover_zucai_then_click_option(self, wait, option_text):
         """鼠标移到「zucai」弹出菜单，再点击指定项（jingzu/beidan/14chang）。"""
-        zucai_btn = wait.until(EC.presence_of_element_located((By.LINK_TEXT, "足彩")))
+        zucai_btn = wait.until(
+            EC.presence_of_element_located((By.LINK_TEXT, ZUCAI_PARENT_LINK_TEXT))
+        )
         ActionChains(self.driver).move_to_element(zucai_btn).perform()
 
         # 等待子菜单中的目标选项真正可见再点击，避免固定 sleep
@@ -224,7 +229,11 @@ class ZhiyunScraper:
 
     def _ensure_zucai_mode(self, menu_option):
         """若页面有 SetLevel，直接调用以切换到jingzu(3)/beidan(2)/14chang(1)。"""
-        level = 3 if menu_option == "竞足" else (2 if menu_option == "北单" else 1)
+        level = (
+            3
+            if menu_option == ZUCAI_JINGZU_LINK_TEXT
+            else (2 if menu_option == ZUCAI_BEIDAN_LINK_TEXT else 1)
+        )
         try:
             ok = self.driver.execute_script(
                 f"return typeof window.SetLevel === 'function' && (window.SetLevel({level}), true);"

@@ -4,7 +4,7 @@
   1. crawl_real.py — 抓取即时比分数据并下载
   2. merge_data.py — 合并为一览表 master_{YYYYMMDD}.csv
   3. calc_car.py   — 计算综合评估并输出 car_{YYYYMMDD}.xlsx
-  4. plot_car.py   — 根据综合评估表生成欧赔/凯利曲线图
+  4. plot_car.py   — 根据综合评估表生成oupei/kaili曲线图
 
 任一步失败则终止，不执行后续步骤。
 

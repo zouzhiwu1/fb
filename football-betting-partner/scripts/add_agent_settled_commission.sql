@@ -1,8 +1,8 @@
--- 已有 partner 库升级：佣金累计与结算流水。
+-- 已有 partner 库升级：服务费累计与结算流水。
 -- 若列/表已存在，请注释掉对应语句后执行。
 
 ALTER TABLE agents
-  ADD COLUMN settled_commission_yuan DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '累计已结算佣金（元）';
+  ADD COLUMN settled_commission_yuan DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '累计已结算服务费（元）';
 
 CREATE TABLE IF NOT EXISTS agent_commission_settlements (
   id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS agent_commission_settlements (
   KEY ix_acs_settlement_month (settlement_month),
   CONSTRAINT fk_acs_partner_admin FOREIGN KEY (partner_admin_id) REFERENCES partner_admins (id),
   CONSTRAINT fk_acs_agent FOREIGN KEY (agent_id) REFERENCES agents (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商佣金结算流水';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商服务费结算流水';

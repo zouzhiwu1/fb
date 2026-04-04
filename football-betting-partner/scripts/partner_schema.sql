@@ -44,11 +44,11 @@ CREATE TABLE IF NOT EXISTS agents (
     payout_account VARCHAR(256) NULL COMMENT '收款账号（支付宝/微信）',
     payout_holder_name VARCHAR(64) NULL COMMENT '收款实名',
     contact VARCHAR(128) NULL COMMENT '联系信息备注',
-    current_rate DECIMAL(6,4) NOT NULL DEFAULT 0 COMMENT '当前佣金比例',
+    current_rate DECIMAL(6,4) NOT NULL DEFAULT 0 COMMENT '当前服务费比例',
     bank_info TEXT NULL COMMENT '银行信息备注（历史兼容字段）',
     status VARCHAR(16) NOT NULL DEFAULT 'active' COMMENT '状态：active/disabled',
     session_version INT NOT NULL DEFAULT 1 COMMENT '登录会话版本号：每次登录自增，旧 token 失效',
-    settled_commission_yuan DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '累计已结算佣金（元）',
+    settled_commission_yuan DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '累计已结算服务费（元）',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uq_agents_agent_code (agent_code),
     UNIQUE KEY uq_agents_login_name (login_name),
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS agent_commission_settlements (
     KEY ix_acs_settlement_month (settlement_month),
     CONSTRAINT fk_acs_partner_admin FOREIGN KEY (partner_admin_id) REFERENCES partner_admins (id),
     CONSTRAINT fk_acs_agent FOREIGN KEY (agent_id) REFERENCES agents (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商佣金结算流水';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代理商服务费结算流水';
 
 CREATE TABLE IF NOT EXISTS payout_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS payout_orders (
     KEY ix_po_status (status),
     CONSTRAINT fk_po_agent FOREIGN KEY (agent_id) REFERENCES agents (id),
     CONSTRAINT fk_po_admin FOREIGN KEY (paid_by_admin_id) REFERENCES partner_admins (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='佣金支付主表（线下打款批次）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='服务费支付主表（线下打款批次）';
 
 -- 依赖 payout_orders：若单独执行本段而无主表，MySQL 会报 1824。
 CREATE TABLE IF NOT EXISTS agent_commission_lines (
@@ -99,13 +99,13 @@ CREATE TABLE IF NOT EXISTS agent_commission_lines (
     agent_id INT NOT NULL COMMENT '代理商 ID，关联 agents.id',
     user_id INT NOT NULL COMMENT '用户 ID',
     username VARCHAR(128) NOT NULL DEFAULT '' COMMENT '用户名快照（展示）',
-    commission_type VARCHAR(16) NOT NULL COMMENT '佣金类型：registration/recharge',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '佣金产生时间',
+    commission_type VARCHAR(16) NOT NULL COMMENT '服务费类型：registration/recharge',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '服务费产生时间',
     reg_factor DECIMAL(14,4) NULL COMMENT '拉新系数快照（仅拉新行）',
     payment_order_id VARCHAR(64) NULL COMMENT '充值订单 ID（仅充值行）',
     recharge_amount DECIMAL(14,2) NULL COMMENT '充值金额快照（仅充值行）',
-    rebate_rate DECIMAL(6,4) NULL COMMENT '返点率快照（仅充值行）',
-    commission_amount DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '本行应付佣金（元）',
+    rebate_rate DECIMAL(6,4) NULL COMMENT '分润率快照（仅充值行）',
+    commission_amount DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '本行应付服务费（元）',
     payment_status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT '支付状态：pending/paid',
     paid_at DATETIME NULL COMMENT '支付时间',
     paid_by_admin_id INT NULL COMMENT '经办管理员 ID，关联 partner_admins.id',
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS agent_commission_lines (
     CONSTRAINT fk_acl_agent FOREIGN KEY (agent_id) REFERENCES agents (id),
     CONSTRAINT fk_acl_admin FOREIGN KEY (paid_by_admin_id) REFERENCES partner_admins (id),
     CONSTRAINT fk_acl_payout_order FOREIGN KEY (payout_order_id) REFERENCES payout_orders (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='佣金明细（拉新/充值统一）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='服务费明细（拉新/充值统一）';
 
 CREATE TABLE IF NOT EXISTS points_ledger (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键，自增',
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS points_ledger (
     order_id VARCHAR(64) NULL COMMENT '关联订单号（可空）',
     event_type VARCHAR(32) NOT NULL COMMENT '事件类型：registration/recharge 等',
     base_amount DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '计算积分前的基准金额',
-    applied_rate DECIMAL(6,4) NOT NULL DEFAULT 0 COMMENT '应用的佣金比例',
+    applied_rate DECIMAL(6,4) NOT NULL DEFAULT 0 COMMENT '应用的服务费比例',
     points_delta DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '本次积分变动（正负）',
     settlement_month VARCHAR(7) NULL COMMENT '归属结算月份 YYYY-MM',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '流水创建时间',

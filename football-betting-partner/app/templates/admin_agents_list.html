@@ -34,12 +34,12 @@
           document.getElementById('list_wrap').innerHTML = '<p class="muted">暂无代理商，请前往「注册代理商」。</p>';
           return;
         }
-        var h = '<table class="list"><thead><tr><th>ID</th><th>推广码</th><th>登录名</th><th>姓名</th><th>电话</th><th>返点率</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+        var h = '<table class="list"><thead><tr><th>ID</th><th>推广码</th><th>登录名</th><th>姓名</th><th>电话</th><th>分润率</th><th>状态</th><th>操作</th></tr></thead><tbody>';
         rows.forEach(function (a) {
           h += '<tr><td>' + esc(a.id) + '</td><td>' + esc(a.agent_code) + '</td><td>' + esc(a.login_name) + '</td><td>' + esc(a.real_name || '—') + '</td><td>' + esc(a.phone || '—') + '</td><td>' + esc(a.current_rate) + '</td><td>' + esc(a.status) + '</td><td class="row-actions">';
           h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id)) + '">查看</a>';
           h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id + '/edit')) + '">修改</a>';
-          h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id + '/commission')) + '">佣金</a>';
+          h += '<a class="text-link" href="' + esc(partnerPath('/admin/agents/' + a.id + '/commission')) + '">服务费</a>';
           h += '</td></tr>';
         });
         h += '</tbody></table>';

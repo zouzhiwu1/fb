@@ -59,7 +59,7 @@ def test_compute_prediction_ascending_order():
     data = pd.DataFrame(
         {f"C{i}": [0.0] * 1 for i in range(12)},
     )
-    data["C6"], data["C7"], data["C8"] = 0.23, 0.20, 0.16  # 即时盘 主/平/客
+    data["C6"], data["C7"], data["C8"] = 0.23, 0.20, 0.16  # jishipan 主/平/客
     grp = data.copy()
     assert _compute_prediction(grp, data) == "客平"
 

@@ -21,6 +21,7 @@ from config import (
     WAIT_AFTER_HOVER,
     WAIT_TABLE_REFRESH,
     ZUCAI_MENU_OPTIONS,
+    ZUCAI_PARENT_LINK_TEXT,
     TARGET_LEAGUE_NAMES,
     COL_LEAGUE,
     COL_HOME,
@@ -92,7 +93,9 @@ def _click_beidan_after_finished(driver, wait, option_text, log):
         pass
     # 2) 回退：zucai → beidan（与即时比分一致）
     log.debug("未找到直接 [%s]，尝试 zucai → %s", option_text, option_text)
-    zucai_btn = wait.until(EC.presence_of_element_located((By.LINK_TEXT, "足彩")))
+    zucai_btn = wait.until(
+        EC.presence_of_element_located((By.LINK_TEXT, ZUCAI_PARENT_LINK_TEXT))
+    )
     ActionChains(driver).move_to_element(zucai_btn).perform()
     time.sleep(WAIT_AFTER_HOVER)
     opts = [o for o in driver.find_elements(By.LINK_TEXT, option_text) if o.is_displayed()]

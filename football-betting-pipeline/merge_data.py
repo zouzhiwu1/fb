@@ -162,7 +162,7 @@ def _collect_files_in_range(start_dt, end_dt, log: logging.Logger, display_root:
 def read_xls_data(path: str):
     """
     读取 .xls 文件（可能是 HTML 表格），从第 6 行起取数据，返回 C,D,E,F,G,H,L,M,N 列。
-    北单等导出的 .xls 多为 HTML，先按 HTML 试多种编码，失败再按 Excel 读。
+    beidan等导出的 .xls 多为 HTML，先按 HTML 试多种编码，失败再按 Excel 读。
     成功返回 (DataFrame, None, None)，失败返回 (None, 错误描述, 完整 traceback 或 None)。
     """
     last_err = None

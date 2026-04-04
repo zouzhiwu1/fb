@@ -202,7 +202,7 @@ def _inject_mute_script(driver):
 
 def main():
     """
-    抓取即时比分数据（当前盘口）。
+    抓取即时比分数据。
 
     用法（与 merge_data.py 保持一致的参数形式）:
       python crawl_real.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>

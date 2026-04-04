@@ -37,19 +37,19 @@ class Agent(db.Model):
     contact = db.Column(db.String(128), nullable=True)
     current_rate = db.Column(
         db.Numeric(6, 4), nullable=False, default=0
-    )  # 如 0.0800 = 本月返点率
+    )  # 如 0.0800 = 本月分润率
     bank_info = db.Column(db.Text(), nullable=True)
     status = db.Column(db.String(16), nullable=False, default="active", index=True)
     session_version = db.Column(db.Integer, nullable=False, default=1)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    # 管理员线下打款后累计已结算佣金（元）
+    # 管理员线下打款后累计已结算服务费（元）
     settled_commission_yuan = db.Column(
         db.Numeric(14, 2), nullable=False, default=0
     )
 
 
 class AgentCommissionSettlement(db.Model):
-    """管理员结算佣金流水：线下打款后在系统登记金额与支付凭证（渠道+订单号）。"""
+    """管理员结算服务费流水：线下打款后在系统登记金额与支付凭证（渠道+订单号）。"""
 
     __tablename__ = "agent_commission_settlements"
 
@@ -75,7 +75,7 @@ class AgentCommissionSettlement(db.Model):
 
 
 class PayoutOrder(db.Model):
-    """佣金支付主表：一次线下打款一条记录。"""
+    """服务费支付主表：一次线下打款一条记录。"""
 
     __tablename__ = "payout_orders"
 
@@ -108,7 +108,7 @@ class PayoutOrder(db.Model):
 
 
 class AgentCommissionLine(db.Model):
-    """佣金支付明细：一条行代表一个可计费业务事件（拉新/充值）。"""
+    """服务费支付明细：一条行代表一个可计费业务事件（拉新/充值）。"""
 
     __tablename__ = "agent_commission_lines"
 

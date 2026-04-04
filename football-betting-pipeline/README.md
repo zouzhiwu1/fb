@@ -80,7 +80,7 @@ football-betting-pipeline/
 ├── crawl_real.py                # 抓取即时比分并下载 .xls
 ├── merge_data.py                # 合并为 master_{YYYYMMDD}.csv
 ├── calc_car.py                  # 计算综合评估，输出 car_{YYYYMMDD}.xlsx
-├── plot_car.py                  # 生成欧赔/凯利曲线图 {主队}_VS_{客队}.png；成功后写入 evaluation_matches 入表
+├── plot_car.py                  # 生成oupei/kaili曲线图 {主队}_VS_{客队}.png；成功后写入 evaluation_matches 入表
 ├── crawl_final.py               # 抓取完场比分，输出 final_{YYYYMMDD}.csv；并维护平台库 evaluation_matches 出表
 ├── add_score_to_image.py        # 将完场比分写入报告图片
 ├── evaluation_sync.py           # 与平台 MySQL evaluation_matches 同步（§3.4 入表/出表）
@@ -241,7 +241,7 @@ python run_final.py 20260314
 python crawl_real.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
 ```
 
-当前版本中，crawl 实际仍按“执行当下的实时盘口”抓取，时间参数主要用于：
+当前版本中，crawl 实际仍按“执行当下的”抓取，时间参数主要用于：
 
 - 与 `run_real.py / merge_data.py / calc_car.py / plot_car.py` 保持一致的调用方式；
 - 在日志中标记本次抓取对应的逻辑时间区间，便于排查。
@@ -280,9 +280,9 @@ python calc_car.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
 
 ---
 
-### plot_car.py — 生成欧赔/凯利曲线图
+### plot_car.py — 生成oupei/kaili曲线图
 
-**功能**：根据综合评估表 `car_{YYYYMMDD}.xlsx` 为每场比赛生成一张图，包含两个子图：**欧赔指数曲线图**（主/平/客三条曲线，第 1 节点为初指 D/E/F，其余节点为各时间点即时盘 G/H/I）、**凯利指数曲线图**（主/平/客三条曲线，X 轴为时间点 C，Y 轴为 J/K/L）。曲线节点数量由表中该场比赛的时间点数量决定，不固定。详见 design.md 第 3.3 节。
+**功能**：根据综合评估表 `car_{YYYYMMDD}.xlsx` 为每场比赛生成一张图，包含两个子图：**oupei指数曲线图**（主/平/客三条曲线，第 1 节点为初指 D/E/F，其余节点为各时间点jishipan G/H/I）、**kailizhishu曲线图**（主/平/客三条曲线，X 轴为时间点 C，Y 轴为 J/K/L）。曲线节点数量由表中该场比赛的时间点数量决定，不固定。详见 design.md 第 3.3 节。
 
 **用法**（仅接收两个时间点参数）：
 

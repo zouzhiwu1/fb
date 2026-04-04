@@ -129,8 +129,22 @@ else:
         kw.strip() for kw in _DEFAULT_TEAM_WHITELIST_KEYWORDS.split(",") if kw.strip()
     ]
 
-# zucai子菜单：目前只抓取「beidan」
-ZUCAI_MENU_OPTIONS = ["北单"]
+# zucai 子菜单「beidan」的 LINK_TEXT（须与页面一致）。默认 \u5317\u5355；可用 CRAWLER_ZUCAI_BEIDAN_LINK_TEXT 覆盖。
+ZUCAI_BEIDAN_LINK_TEXT = (
+    (os.environ.get("CRAWLER_ZUCAI_BEIDAN_LINK_TEXT") or "\u5317\u5355").strip()
+    or "\u5317\u5355"
+)
+ZUCAI_MENU_OPTIONS = [ZUCAI_BEIDAN_LINK_TEXT]
+# 智云顶部「zucai」主菜单的 LINK_TEXT（须与页面一致）。默认 \u8db3\u5f69（即 zucai）；可用 CRAWLER_ZUCAI_PARENT_LINK_TEXT 覆盖。
+ZUCAI_PARENT_LINK_TEXT = (
+    (os.environ.get("CRAWLER_ZUCAI_PARENT_LINK_TEXT") or "\u8db3\u5f69").strip()
+    or "\u8db3\u5f69"
+)
+# zucai 子菜单「jinzu」的 LINK_TEXT（SetLevel 分支须与页面菜单文案一致）。默认 \u7ade\u8db3；可用 CRAWLER_ZUCAI_JINGZU_LINK_TEXT 覆盖。
+ZUCAI_JINGZU_LINK_TEXT = (
+    (os.environ.get("CRAWLER_ZUCAI_JINGZU_LINK_TEXT") or "\u7ade\u8db3").strip()
+    or "\u7ade\u8db3"
+)
 
 # 联赛白名单：beidan「即时比分」「完场比分」主表仅抓取下列联赛（单元格简称与名单匹配，见 league_whitelist.py）。
 # 可通过环境变量 CRAWLER_TARGET_LEAGUES 覆盖（英文逗号分隔）；设为空字符串表示关闭联赛白名单（不限制）。

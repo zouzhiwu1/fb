@@ -15,7 +15,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/merge_data.py",
             "args": [
-                "/Users/zhiwuzou/Documents/足球彩票/北单/20260306"
+                "/Users/zhiwuzou/Documents/zuqiucaip/beidan/20260306"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"

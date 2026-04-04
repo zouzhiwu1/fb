@@ -1,4 +1,4 @@
--- 佣金结算流水：线下打款凭证（支付渠道 + 订单号 + 备注），不再使用 agent_bank_account。
+-- 服务费结算流水：线下打款凭证（支付渠道 + 订单号 + 备注），不再使用 agent_bank_account。
 -- 在已有 agent_commission_settlements 的库上执行；若列已存在请注释对应行。
 
 ALTER TABLE agent_commission_settlements

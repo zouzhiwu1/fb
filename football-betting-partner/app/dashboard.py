@@ -269,7 +269,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
         else:
             recharge_amt = float(row.recharge_amount or 0)
             rebate_pct = float(row.rebate_rate or 0) * 100
-            remark = f"充值金额 {recharge_amt:.2f} 元，返点率 {rebate_pct:.2f}%"
+            remark = f"充值金额 {recharge_amt:.2f} 元，分润率 {rebate_pct:.2f}%"
         commission_lines.append(
             {
                 "id": int(row.id),
@@ -304,7 +304,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
         "recharges_total_yuan": round(recharge_sum, 2),
         "commission_lines": commission_lines,
         "notes": {
-            "formula": "总业绩=拉新业绩+充值业绩；积分=总业绩×本月返点率；佣金=积分×积分系数。",
+            "formula": "总业绩=拉新业绩+充值业绩；积分=总业绩×本月分润率；服务费=积分×积分系数。",
             "ledger": "points_ledger_month 为当月流水汇总（settlement_month 或创建时间落在本月）。",
         },
     }
@@ -312,7 +312,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
 
 @partner_ui_bp.route("/stats/monthly-board", methods=["GET"])
 def partner_monthly_board():
-    """文档 1.2：按月汇总业绩/积分/佣金 + 拉新明细 + 充值明细（依赖 users / payment_orders / points_ledger）。"""
+    """文档 1.2：按月汇总业绩/积分/服务费 + 拉新明细 + 充值明细（依赖 users / payment_orders / points_ledger）。"""
     agent, err = require_partner_token()
     if err:
         return err

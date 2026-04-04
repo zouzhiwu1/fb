@@ -1,4 +1,4 @@
--- 佣金结算流水扩展：操作管理员、结算月份、代理商银行账户快照。
+-- 服务费结算流水扩展：操作管理员、结算月份、代理商银行账户快照。
 -- 在已存在 agent_commission_settlements 的库上执行；若列已存在请注释对应行。
 
 ALTER TABLE agent_commission_settlements
