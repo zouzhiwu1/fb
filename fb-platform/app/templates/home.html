@@ -9,29 +9,29 @@
   </div>
   <p class="muted" style="margin: 0 0 4px 0;">选择功能</p>
   <div class="menu-grid">
-    <a class="menu-card" href="/account">
+    <a class="menu-card" href="{{ app_prefix }}/account">
       <h3>账户资料</h3>
       <p>查看注册信息，修改密码、手机号与邮箱</p>
     </a>
-    <a class="menu-card" href="/membership">
+    <a class="menu-card" href="{{ app_prefix }}/membership">
       <h3>会员信息</h3>
       <p>会员状态、到期时间与当前权益明细</p>
     </a>
-    <a class="menu-card" href="/recharge">
+    <a class="menu-card" href="{{ app_prefix }}/recharge">
       <h3>会员充值</h3>
       <p>选择档位创建订单（支付宝 / 微信）</p>
     </a>
-    <a class="menu-card" href="/recharge-records">
+    <a class="menu-card" href="{{ app_prefix }}/recharge-records">
       <h3>充值信息</h3>
       <p>查询订单与支付状态</p>
     </a>
-    <a class="menu-card" href="/curves">
+    <a class="menu-card" href="{{ app_prefix }}/curves">
       <h3>曲线图查询</h3>
       <p>按日期、球队名搜索并查看曲线图</p>
     </a>
   </div>
   <div class="btn-logout-wrap">
-    <a href="/login" class="btn-logout" id="logout-link">退出登录</a>
+    <a href="{{ app_prefix }}/login" class="btn-logout" id="logout-link">退出登录</a>
   </div>
 {% endblock %}
 {% block extra_js %}

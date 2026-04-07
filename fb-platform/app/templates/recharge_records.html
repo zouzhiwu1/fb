@@ -23,19 +23,19 @@
 {% endblock %}
 {% block content %}
   <div class="nav-links">
-    <a href="/home">首页</a>
-    <a href="/recharge">会员充值</a>
-    <a href="/membership">会员信息</a>
-    <a href="/account">账户资料</a>
-    <a href="/curves">曲线图</a>
-    <a href="/login" id="logout-nav">退出登录</a>
+    <a href="{{ app_prefix }}/home">首页</a>
+    <a href="{{ app_prefix }}/recharge">会员充值</a>
+    <a href="{{ app_prefix }}/membership">会员信息</a>
+    <a href="{{ app_prefix }}/account">账户资料</a>
+    <a href="{{ app_prefix }}/curves">曲线图</a>
+    <a href="{{ app_prefix }}/login" id="logout-nav">退出登录</a>
   </div>
   <h1>充值信息</h1>
   <p class="hint">展示当前账号在平台创建的会员购买订单（待支付 / 已支付 / 已关闭）。</p>
 
   <div class="toolbar">
     <button type="button" class="secondary small" id="btn-refresh">刷新</button>
-    <a href="/recharge" style="font-size:14px;color:#2563eb;">去充值</a>
+    <a href="{{ app_prefix }}/recharge" style="font-size:14px;color:#2563eb;">去充值</a>
   </div>
 
   <div id="loading" class="hint">加载中…</div>
@@ -47,7 +47,7 @@
 (function() {
   var token = localStorage.getItem('token');
   if (!token) {
-    window.location.href = '/login';
+    window.location.href = window.fbPlatformUrl('/login');
     return;
   }
 
@@ -70,12 +70,12 @@
     document.getElementById('msg-err').style.display = 'none';
     document.getElementById('loading').style.display = 'block';
     document.getElementById('table-wrap').style.display = 'none';
-    fetch('/api/pay/orders?limit=100', { headers: { 'Authorization': 'Bearer ' + token } })
+    fetch(window.fbPlatformUrl('/api/pay/orders?limit=100'), { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(r) {
         if (r.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('username');
-          window.location.href = '/login';
+          window.location.href = window.fbPlatformUrl('/login');
           return Promise.reject();
         }
         return r.json();
@@ -92,7 +92,7 @@
         var wrap = document.getElementById('table-wrap');
         wrap.style.display = 'block';
         if (!orders.length) {
-          wrap.innerHTML = '<p class="empty">暂无充值订单。<a href="/recharge">去创建一笔订单</a></p>';
+          wrap.innerHTML = '<p class="empty">暂无充值订单。<a href="' + window.fbPlatformUrl('/recharge') + '">去创建一笔订单</a></p>';
           return;
         }
         var rows = orders.map(function(o) {

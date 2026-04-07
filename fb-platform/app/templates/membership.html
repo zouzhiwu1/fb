@@ -30,12 +30,12 @@
 {% endblock %}
 {% block content %}
   <div class="nav-links">
-    <a href="/home">首页</a>
-    <a href="/recharge">会员充值</a>
-    <a href="/recharge-records">充值信息</a>
-    <a href="/account">账户资料</a>
-    <a href="/curves">曲线图</a>
-    <a href="/login" id="logout-nav">退出登录</a>
+    <a href="{{ app_prefix }}/home">首页</a>
+    <a href="{{ app_prefix }}/recharge">会员充值</a>
+    <a href="{{ app_prefix }}/recharge-records">充值信息</a>
+    <a href="{{ app_prefix }}/account">账户资料</a>
+    <a href="{{ app_prefix }}/curves">曲线图</a>
+    <a href="{{ app_prefix }}/login" id="logout-nav">退出登录</a>
   </div>
   <h1>会员信息</h1>
 
@@ -63,7 +63,7 @@
 (function() {
   var token = localStorage.getItem('token');
   if (!token) {
-    window.location.href = '/login';
+    window.location.href = window.fbPlatformUrl('/login');
     return;
   }
 
@@ -90,12 +90,12 @@
     localStorage.removeItem('username');
   };
 
-  fetch('/api/membership/status', { headers: { 'Authorization': 'Bearer ' + token } })
+  fetch(window.fbPlatformUrl('/api/membership/status'), { headers: { 'Authorization': 'Bearer ' + token } })
     .then(function(r) {
       if (r.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('username');
-        window.location.href = '/login';
+        window.location.href = window.fbPlatformUrl('/login');
         return Promise.reject();
       }
       return r.json();

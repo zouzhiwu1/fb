@@ -154,7 +154,7 @@
 <body>
   <div class="page">
     <div class="curves-query-dock">
-      <p class="back-link"><a href="/home">← 返回首页</a></p>
+      <p class="back-link"><a href="{{ app_prefix }}/home">← 返回首页</a></p>
       <h1>曲线图查询</h1>
       <div class="search-bar">
         <label for="dateInput">日期 <span style="color:#b91c1c">*</span></label>
@@ -171,6 +171,14 @@
     </div>
   </div>
 
+  <script>
+    window.APP_PREFIX = {{ app_prefix|tojson }};
+    window.fbPlatformUrl = function (path) {
+      var p = path || '';
+      if (p.charAt(0) !== '/') p = '/' + p;
+      return (window.APP_PREFIX || '') + p;
+    };
+  </script>
   <script>
     const dateInput = document.getElementById('dateInput');
     const teamInput = document.getElementById('team');
@@ -227,12 +235,12 @@
       resultsEl.innerHTML = '';
 
       try {
-        const url = '/api/curves/search?date=' + encodeURIComponent(date) + '&team=' + encodeURIComponent(team);
+        const url = window.fbPlatformUrl('/api/curves/search?date=' + encodeURIComponent(date) + '&team=' + encodeURIComponent(team));
         const r = await fetch(url, { headers: getAuthHeaders() });
         const data = await r.json();
         if (r.status === 401 || (data.message && data.message.indexOf('登录') !== -1)) {
           showMessage('请先登录后再查询。', 'error');
-          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="/login">去登录</a></p>';
+          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="' + window.fbPlatformUrl('/login') + '">去登录</a></p>';
           return;
         }
         if (data.member_only && data.message) {
@@ -279,7 +287,7 @@
     function loadImageWithAuth(imgEl, date, filename) {
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) return;
-      fetch('/api/curves/img/' + encodeURIComponent(date) + '/' + encodeURIComponent(filename), {
+      fetch(window.fbPlatformUrl('/api/curves/img/' + encodeURIComponent(date) + '/' + encodeURIComponent(filename)), {
         headers: { 'Authorization': 'Bearer ' + token }
       })
         .then(r => {
@@ -298,11 +306,11 @@
       teamInput.value = '';
       let isMemberUser = false;
       try {
-        const r = await fetch('/api/membership/status', { headers: getAuthHeaders() });
+        const r = await fetch(window.fbPlatformUrl('/api/membership/status'), { headers: getAuthHeaders() });
         const data = await r.json();
         if (r.status === 401 || (data && data.ok === false)) {
           showMessage('请先登录后再查询。', 'error');
-          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="/login">去登录</a></p>';
+          resultsEl.innerHTML = '<p style="margin-top:0.5rem;"><a href="' + window.fbPlatformUrl('/login') + '">去登录</a></p>';
           return;
         }
         isMemberUser = !!(data && data.is_member);

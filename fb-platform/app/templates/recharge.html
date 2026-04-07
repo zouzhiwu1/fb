@@ -39,12 +39,12 @@
 {% endblock %}
 {% block content %}
   <div class="nav-links">
-    <a href="/home">首页</a>
-    <a href="/membership">会员信息</a>
-    <a href="/recharge-records">充值信息</a>
-    <a href="/account">账户资料</a>
-    <a href="/curves">曲线图</a>
-    <a href="/login" id="logout-nav">退出登录</a>
+    <a href="{{ app_prefix }}/home">首页</a>
+    <a href="{{ app_prefix }}/membership">会员信息</a>
+    <a href="{{ app_prefix }}/recharge-records">充值信息</a>
+    <a href="{{ app_prefix }}/account">账户资料</a>
+    <a href="{{ app_prefix }}/curves">曲线图</a>
+    <a href="{{ app_prefix }}/login" id="logout-nav">退出登录</a>
   </div>
   <h1>会员充值</h1>
   <div class="recharge-main">
@@ -75,7 +75,7 @@
       <p style="margin:8px 0 0 0;">真实生产需由服务端调起支付宝、微信收银台。联调时可使用仓库内脚本模拟支付成功回调：</p>
       <code id="cmd-alipay"></code>
       <code id="cmd-wechat" style="margin-top:10px;"></code>
-      <p style="margin:10px 0 0 0;">执行后请到 <a href="/membership">会员信息</a> 或 <a href="/recharge-records">充值信息</a> 查看是否已支付。</p>
+      <p style="margin:10px 0 0 0;">执行后请到 <a href="{{ app_prefix }}/membership">会员信息</a> 或 <a href="{{ app_prefix }}/recharge-records">充值信息</a> 查看是否已支付。</p>
     </div>
   </div>
   </div>
@@ -85,7 +85,7 @@
 (function() {
   var token = localStorage.getItem('token');
   if (!token) {
-    window.location.href = '/login';
+    window.location.href = window.fbPlatformUrl('/login');
     return;
   }
   var selectedType = null;
@@ -103,7 +103,7 @@
     localStorage.removeItem('username');
   };
 
-  fetch('/api/pay/membership-options')
+  fetch(window.fbPlatformUrl('/api/pay/membership-options'))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       document.getElementById('options-loading').style.display = 'none';
@@ -153,7 +153,7 @@
     if (!selectedType) { showMsg('请选择档位', true); return; }
     var btn = document.getElementById('btn-create');
     btn.disabled = true;
-    fetch('/api/pay/orders', {
+    fetch(window.fbPlatformUrl('/api/pay/orders'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({ membership_type: selectedType })
