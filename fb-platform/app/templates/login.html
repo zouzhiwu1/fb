@@ -10,7 +10,7 @@
     <button type="submit" class="primary" id="btn-submit">登录</button>
   </form>
   <div id="msg" class="msg" style="display:none;"></div>
-  <p class="link-row">还没有账号？<a href="{{ app_prefix }}/register">去注册</a></p>
+  <p class="link-row">还没有账号？<a href="/register">去注册</a></p>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -30,7 +30,7 @@
     if (!/^\d{11}$/.test(phone)) { showMsg('请输入 11 位有效手机号', true); return; }
     if (!password) { showMsg('请输入密码', true); return; }
     btn.disabled = true;
-    fetch(window.fbPlatformUrl('/api/auth/login'), {
+    fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: phone, password: password })
@@ -40,7 +40,7 @@
         if (data.ok) {
           if (data.token) localStorage.setItem('token', data.token);
           if (data.user) localStorage.setItem('username', data.user.username || data.user.phone);
-          window.location.href = window.fbPlatformUrl('/home');
+          window.location.href = '/home';
         } else {
           showMsg(data.message || '登录失败', true);
           btn.disabled = false;

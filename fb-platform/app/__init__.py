@@ -7,7 +7,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 from config import (
-    APPLICATION_PREFIX,
     CURVES_REQUIRE_ACTIVE_MEMBERSHIP,
     DailyPlatformFileHandler,
     JWT_SECRET_KEY,
@@ -52,14 +51,9 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = JWT_SECRET_KEY
     app.config["CURVES_REQUIRE_ACTIVE_MEMBERSHIP"] = CURVES_REQUIRE_ACTIVE_MEMBERSHIP
-    app.config["APPLICATION_PREFIX"] = APPLICATION_PREFIX
     CORS(app)
 
     db.init_app(app)
-
-    @app.context_processor
-    def inject_app_prefix():
-        return {"app_prefix": app.config["APPLICATION_PREFIX"]}
 
     from app.auth import auth_bp
     from app.curves import curves_bp
