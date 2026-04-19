@@ -3,7 +3,8 @@
 """
 模拟微信支付结果通知 POST（WECHAT_PAY_MODE=mock 联调）。
 
-默认发 JSON（与 curl 一致）；生产环境微信发 XML，本服务亦支持。
+默认发 JSON（与 curl 一致）；生产环境 V2 多为 XML，本服务亦支持。
+WECHAT_PAY_MODE=v3 时真实回调为微信签名的加密 JSON，本脚本无法模拟；请用 mock 联调或 tests/test_wechat_pay_v3.py。
 
 用法：
   python3 scripts/simulate_wechat_notify.py \\
@@ -86,6 +87,12 @@ def main() -> int:
     compact = r.text.replace("\n", "").replace(" ", "")
     if "<![CDATA[SUCCESS]]></return_code>" in compact or "<return_code>SUCCESS</return_code>" in compact.lower():
         return 0
+    try:
+        j = r.json()
+        if isinstance(j, dict) and str(j.get("code", "")).upper() == "SUCCESS":
+            return 0
+    except Exception:
+        pass
     return 1
 
 

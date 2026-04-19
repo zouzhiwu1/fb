@@ -48,6 +48,7 @@ Page({
           return;
         }
         api.setSession(data.token, data.user);
+        api.bindWechatMp();
         wx.reLaunch({ url: '/pages/home/home' });
       })
       .catch((e) => {

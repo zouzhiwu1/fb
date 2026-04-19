@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-微信支付结果通知适配器（V2 XML 为主；mock 下支持 JSON/表单便于 curl）。
+微信支付结果通知适配器。
+- mock：JSON/XML 等扁平字段，便于 curl / simulate 脚本
+- v2：XML + MD5（商户 API 密钥）
+- v3：JSON + 平台公钥验签 + APIv3 密钥解密 resource
 履约统一走 MembershipFulfillmentPort。
 """
 from __future__ import annotations
 
+import json
 import logging
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from flask import Request, Response
 
@@ -19,7 +24,18 @@ from app.payment_fulfillment import (
     default_membership_fulfillment,
 )
 from app.wechat_notify import verify_v2_sign, xml_body_to_dict
-from config import WECHAT_API_KEY, WECHAT_MOCK_SECRET, WECHAT_PAY_MODE
+from app.wechat_pay_v3 import (
+    decrypt_notify_resource,
+    load_public_key_from_pem,
+    verify_wechatpay_signature,
+)
+from config import (
+    WECHAT_API_KEY,
+    WECHAT_API_V3_KEY,
+    WECHAT_MOCK_SECRET,
+    WECHAT_PAY_MODE,
+    WECHAT_PLATFORM_PUBLIC_KEY_PEM,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +131,136 @@ def _outcome_to_xml(outcome: FulfillOutcome) -> str:
     return WECHAT_ACK_FAIL_XML
 
 
+def _json_v3_ack(ok: bool, message: str = "") -> tuple[Response, int]:
+    body = {
+        "code": "SUCCESS" if ok else "FAIL",
+        "message": message or ("成功" if ok else "失败"),
+    }
+    r = Response(
+        json.dumps(body, ensure_ascii=False),
+        status=200,
+        mimetype="application/json; charset=utf-8",
+    )
+    return r, 200
+
+
+def _v3_amount_total_to_yuan_str(total: Any) -> str | None:
+    try:
+        fen = Decimal(str(int(total)))
+        yuan = (fen / Decimal(100)).quantize(Decimal("0.01"))
+        return format(yuan, "f")
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _handle_wechat_notify_v3(
+    req: Request,
+    fulfillment: MembershipFulfillmentPort,
+) -> tuple[Response, int]:
+    raw_body = req.get_data(as_text=True) or ""
+    ts = (req.headers.get("Wechatpay-Timestamp") or "").strip()
+    nonce = (req.headers.get("Wechatpay-Nonce") or "").strip()
+    sig = (req.headers.get("Wechatpay-Signature") or "").strip()
+    if not ts or not nonce or not sig:
+        logger.warning("wechat v3 notify missing signature headers")
+        return Response("missing headers", status=401, mimetype="text/plain"), 401
+
+    try:
+        pub = load_public_key_from_pem(WECHAT_PLATFORM_PUBLIC_KEY_PEM)
+    except ValueError as e:
+        logger.warning("wechat v3 platform key: %s", e)
+        return Response("server misconfigured", status=500, mimetype="text/plain"), 500
+
+    if not verify_wechatpay_signature(
+        body=raw_body,
+        timestamp=ts,
+        nonce=nonce,
+        signature_b64=sig,
+        public_key=pub,
+    ):
+        logger.warning("wechat v3 notify signature verify failed")
+        return Response("invalid signature", status=401, mimetype="text/plain"), 401
+
+    try:
+        outer = json.loads(raw_body)
+    except json.JSONDecodeError:
+        logger.warning("wechat v3 notify invalid json")
+        return Response("bad json", status=400, mimetype="text/plain"), 400
+
+    event_type = (outer.get("event_type") or "").strip()
+    if event_type != "TRANSACTION.SUCCESS":
+        return _json_v3_ack(True, "成功")
+
+    resource = outer.get("resource") or {}
+    if not isinstance(resource, dict):
+        return _json_v3_ack(False, "无 resource")
+
+    algorithm = (resource.get("algorithm") or "").strip()
+    if algorithm != "AEAD_AES_256_GCM":
+        logger.warning("wechat v3 notify unknown algorithm %s", algorithm)
+        return _json_v3_ack(False, "不支持的通知算法")
+
+    ciphertext = (resource.get("ciphertext") or "").strip()
+    nonce_r = (resource.get("nonce") or "").strip()
+    aad = (resource.get("associated_data") or "").strip()
+    if not ciphertext or not nonce_r:
+        return _json_v3_ack(False, "resource 不完整")
+
+    try:
+        trade = decrypt_notify_resource(
+            api_v3_key=WECHAT_API_V3_KEY,
+            associated_data=aad,
+            nonce=nonce_r,
+            ciphertext_b64=ciphertext,
+        )
+    except Exception as e:
+        logger.warning("wechat v3 notify decrypt failed: %s", e)
+        return Response("decrypt failed", status=500, mimetype="text/plain"), 500
+
+    trade_state = (trade.get("trade_state") or "").strip()
+    if trade_state != "SUCCESS":
+        return _json_v3_ack(True, "成功")
+
+    out_trade_no = (trade.get("out_trade_no") or "").strip()
+    transaction_id = (trade.get("transaction_id") or "").strip()
+    amount = trade.get("amount") or {}
+    total = amount.get("total") if isinstance(amount, dict) else None
+    paid_yuan = _v3_amount_total_to_yuan_str(total)
+    if not out_trade_no or not paid_yuan:
+        return _json_v3_ack(False, "订单字段缺失")
+
+    payment = VerifiedPayment(
+        merchant_order_id=out_trade_no,
+        provider_trade_id=transaction_id,
+        paid_amount=paid_yuan,
+    )
+    outcome = fulfillment.fulfill(payment)
+
+    if outcome.result in (
+        FulfillResult.OK_ALREADY_FULFILLED,
+        FulfillResult.OK_FULFILLED,
+    ):
+        return _json_v3_ack(True, "成功")
+
+    if outcome.result == FulfillResult.ERR_EXCEPTION:
+        return Response("exception", status=500, mimetype="text/plain"), 500
+
+    return _json_v3_ack(False, outcome.result.value)
+
+
 def handle_wechat_notify(
     req: Request,
     fulfillment: MembershipFulfillmentPort | None = None,
 ) -> tuple[Response, int]:
     """
     处理微信支付异步通知。
-    成功处理须返回 XML（业务层 return_code SUCCESS），否则微信会重试。
+    mock / v2：成功时返回 XML（return_code SUCCESS）；v3：返回 JSON（code SUCCESS）。
     """
     fulfillment = fulfillment or default_membership_fulfillment
+
+    if WECHAT_PAY_MODE == "v3":
+        return _handle_wechat_notify_v3(req, fulfillment)
+
     params = _params_from_request(req)
 
     if not _verify_wechat_params(params, req):

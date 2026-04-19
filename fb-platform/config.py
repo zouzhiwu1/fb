@@ -121,13 +121,78 @@ else:
     ALIPAY_PUBLIC_KEY_PEM = os.environ.get("ALIPAY_PUBLIC_KEY_PEM", "")
 
 # ---------------------------------------------------------------------------
-# 微信支付 / 结果通知（V2 MD5 验签）
+# 微信支付 / 结果通知
 # ---------------------------------------------------------------------------
 # mock：不验签；可选 WECHAT_MOCK_SECRET + 请求头 X-Wechat-Mock-Secret
-# v2 ：按商户平台 API 密钥验 MD5 签名（XML/表单字段）
+# v2 ：V2 API 密钥 + XML/MD5（统一下单与回调）
+# v3 ：API v3 JSON + 商户证书；回调为 JSON + 平台公钥验签 + APIv3 密钥解密 resource
 WECHAT_PAY_MODE = os.environ.get("WECHAT_PAY_MODE", "mock").strip().lower()
 WECHAT_MOCK_SECRET = os.environ.get("WECHAT_MOCK_SECRET", "")
 WECHAT_API_KEY = os.environ.get("WECHAT_API_KEY", "")
+# 微信小程序：开放平台 AppID / AppSecret（jscode2session）；与「公众号」可相同主体下的小程序
+WECHAT_MP_APP_ID = os.environ.get("WECHAT_MP_APP_ID", "").strip()
+WECHAT_MP_APP_SECRET = os.environ.get("WECHAT_MP_APP_SECRET", "").strip()
+# 微信支付商户号（V2 统一下单 / V3 JSAPI 共用）
+WECHAT_MCH_ID = os.environ.get("WECHAT_MCH_ID", "").strip()
+
+# V3：商户 API 证书私钥（PEM）；路径优先于内联 PEM
+_mch_pk_path = os.environ.get("WECHAT_MCH_PRIVATE_KEY_PATH", "").strip()
+if _mch_pk_path and os.path.isfile(_mch_pk_path):
+    with open(_mch_pk_path, "r", encoding="utf-8") as _f:
+        WECHAT_MCH_PRIVATE_KEY_PEM = _f.read()
+else:
+    WECHAT_MCH_PRIVATE_KEY_PEM = os.environ.get("WECHAT_MCH_PRIVATE_KEY_PEM", "").strip()
+
+# V3：商户 API 证书（apiclient_cert.pem）；路径优先于内联 PEM（用于解析序列号或核对，不参与 HTTP 签名）
+_mch_cert_path = os.environ.get("WECHAT_MCH_CERT_PATH", "").strip()
+if _mch_cert_path and os.path.isfile(_mch_cert_path):
+    with open(_mch_cert_path, "r", encoding="utf-8") as _f:
+        WECHAT_MCH_CERT_PEM = _f.read()
+else:
+    WECHAT_MCH_CERT_PEM = os.environ.get("WECHAT_MCH_CERT_PEM", "").strip()
+
+WECHAT_MCH_CERT_SERIAL = os.environ.get("WECHAT_MCH_CERT_SERIAL", "").strip()
+if not WECHAT_MCH_CERT_SERIAL and WECHAT_MCH_CERT_PEM.strip():
+    try:
+        from cryptography import x509
+
+        _mch_cert = x509.load_pem_x509_certificate(WECHAT_MCH_CERT_PEM.encode("utf-8"))
+        WECHAT_MCH_CERT_SERIAL = format(_mch_cert.serial_number, "X")
+    except Exception:
+        WECHAT_MCH_CERT_SERIAL = ""
+# V3：微信平台公钥（用于验应答/回调签名）；请求头 Wechatpay-Serial 填公钥 ID
+_plat_pk_path = os.environ.get("WECHAT_PLATFORM_PUBLIC_KEY_PATH", "").strip()
+if _plat_pk_path and os.path.isfile(_plat_pk_path):
+    with open(_plat_pk_path, "r", encoding="utf-8") as _f:
+        WECHAT_PLATFORM_PUBLIC_KEY_PEM = _f.read()
+else:
+    WECHAT_PLATFORM_PUBLIC_KEY_PEM = os.environ.get(
+        "WECHAT_PLATFORM_PUBLIC_KEY_PEM", ""
+    ).strip()
+
+WECHAT_PLATFORM_PUBLIC_KEY_ID = os.environ.get(
+    "WECHAT_PLATFORM_PUBLIC_KEY_ID", ""
+).strip()
+# V3：商户平台「APIv3 密钥」（32 字节），用于解密支付成功通知中的 resource
+WECHAT_API_V3_KEY = os.environ.get("WECHAT_API_V3_KEY", "").strip()
+
+
+def wechat_v3_config_ok() -> bool:
+    """WECHAT_PAY_MODE=v3 时 JSAPI 下单与回调解密验签所需配置是否齐全。"""
+    try:
+        key_len = len(WECHAT_API_V3_KEY.encode("utf-8"))
+    except Exception:
+        return False
+    if key_len != 32:
+        return False
+    return bool(
+        WECHAT_MP_APP_ID
+        and WECHAT_MCH_ID
+        and WECHAT_MCH_CERT_SERIAL
+        and WECHAT_MCH_PRIVATE_KEY_PEM
+        and WECHAT_PLATFORM_PUBLIC_KEY_PEM
+        and WECHAT_PLATFORM_PUBLIC_KEY_ID
+    )
 
 
 def _load_membership_prices() -> dict[str, str]:

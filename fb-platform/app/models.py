@@ -19,6 +19,8 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     # 会员系统：是否已赠送过周会员（仅一次）
     free_week_granted_at = db.Column(db.DateTime, nullable=True)
+    # 微信小程序支付：jscode2session 得到的 openid（与账号绑定后用于 JSAPI 下单）
+    wechat_mp_openid = db.Column(db.String(64), nullable=True, index=True)
 
     def to_dict(self):
         return {
@@ -29,6 +31,7 @@ class User(db.Model):
             "email": self.email,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "password_set": bool(self.password_hash),
+            "wechat_mp_bound": bool(self.wechat_mp_openid),
         }
 
 

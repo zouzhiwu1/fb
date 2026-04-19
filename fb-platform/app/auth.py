@@ -18,7 +18,10 @@ from config import (
     JWT_EXPIRE_HOURS,
     SMS_CODE_EXPIRE,
     SMS_SEND_INTERVAL,
+    WECHAT_MP_APP_ID,
+    WECHAT_MP_APP_SECRET,
 )
+from app.wechat_mp_client import jscode2session
 from fb_common import validate_password_strength
 
 auth_bp = Blueprint("auth", __name__)
@@ -388,3 +391,43 @@ def change_phone():
         "message": "手机号已更新，请使用新手机号登录",
         "user": user.to_dict(),
     })
+
+
+@auth_bp.route("/wechat-mp/bind", methods=["POST"])
+def wechat_mp_bind():
+    """
+    登录后绑定微信小程序 openid（用于 JSAPI 支付）。
+    Header: Authorization: Bearer <token>
+    Body: { "code": "<wx.login 返回的 code>" }
+    """
+    user, err = _current_user_from_bearer()
+    if err:
+        body, status = err
+        return body, status
+    data = request.get_json() or {}
+    code = (data.get("code") or "").strip()
+    if not code:
+        return jsonify({"ok": False, "message": "缺少 code"}), 400
+    if not WECHAT_MP_APP_ID or not WECHAT_MP_APP_SECRET:
+        return jsonify({
+            "ok": False,
+            "message": "服务端未配置 WECHAT_MP_APP_ID / WECHAT_MP_APP_SECRET",
+        }), 503
+
+    sess = jscode2session(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, code)
+    errcode = sess.get("errcode")
+    if errcode not in (None, 0):
+        return jsonify({
+            "ok": False,
+            "message": sess.get("errmsg") or f"微信接口错误 errcode={errcode}",
+        }), 400
+    openid = (sess.get("openid") or "").strip()
+    if not openid:
+        return jsonify({"ok": False, "message": "未返回 openid"}), 400
+
+    for other in User.query.filter_by(wechat_mp_openid=openid).all():
+        if other.id != user.id:
+            other.wechat_mp_openid = None
+    user.wechat_mp_openid = openid
+    db.session.commit()
+    return jsonify({"ok": True, "user": user.to_dict()})

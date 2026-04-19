@@ -58,6 +58,39 @@ function clearSession() {
   wx.removeStorageSync(USER_KEY);
 }
 
+/**
+ * 登录/进入首页后调用：wx.login 换 code，服务端绑定 openid（微信小程序支付前置条件）。
+ */
+function bindWechatMp() {
+  const token = getToken();
+  if (!token) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    wx.login({
+      success: (r) => {
+        if (!r.code) {
+          resolve();
+          return;
+        }
+        request('/api/auth/wechat-mp/bind', {
+          method: 'POST',
+          token,
+          data: { code: r.code },
+        })
+          .then((res) => {
+            if (res.ok && res.data && res.data.ok && res.data.user) {
+              setSession(token, res.data.user);
+            }
+          })
+          .catch(() => {})
+          .finally(resolve);
+      },
+      fail: () => resolve(),
+    });
+  });
+}
+
 function curveImageUrl(date, filename) {
   return `${API_BASE}/api/curves/img/${date}/${encodeURIComponent(filename)}`;
 }
@@ -89,6 +122,7 @@ module.exports = {
   getUser,
   setSession,
   clearSession,
+  bindWechatMp,
   curveImageUrl,
   downloadAuthorizedFile,
 };

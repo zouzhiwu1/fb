@@ -140,6 +140,7 @@ Page({
         }
         if (data.token && data.user) {
           api.setSession(data.token, data.user);
+          api.bindWechatMp();
           wx.reLaunch({ url: '/pages/home/home' });
           return;
         }

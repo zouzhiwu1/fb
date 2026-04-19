@@ -14,6 +14,7 @@ Page({
     const user = api.getUser();
     const name = user?.username || user?.phone || '用户';
     this.setData({ displayName: name });
+    api.bindWechatMp();
   },
 
   go(e) {
