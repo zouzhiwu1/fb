@@ -14,15 +14,7 @@
   <input class="input" password placeholder-class="ph" value="{{password}}" bindinput="onPassword" />
 
   <view class="label">手机号</view>
-  <view class="phone-row">
-    <input class="input flex1" type="number" maxlength="11" placeholder-class="ph" value="{{phone}}" bindinput="onPhone" />
-    <view class="code-btn {{sending || cooldown > 0 ? 'disabled' : ''}}" bindtap="onSendCode">
-      {{cooldown > 0 ? cooldown + 's' : sending ? '…' : '验证码'}}
-    </view>
-  </view>
-
-  <view class="label">短信验证码</view>
-  <input class="input" type="number" maxlength="8" placeholder-class="ph" value="{{code}}" bindinput="onCode" />
+  <input class="input" type="number" maxlength="11" placeholder-class="ph" value="{{phone}}" bindinput="onPhone" />
 
   <view class="label">邮箱</view>
   <input class="input" placeholder-class="ph" value="{{email}}" bindinput="onEmail" />

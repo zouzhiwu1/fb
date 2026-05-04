@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-认证相关 API：发送验证码、注册、登录。
+认证相关 API：发送验证码、注册、登录、微信小程序快捷登录。
 """
 from datetime import datetime, timedelta, timezone
+import secrets
 
 import jwt
 from flask import Blueprint, request, jsonify
@@ -21,7 +22,7 @@ from config import (
     WECHAT_MP_APP_ID,
     WECHAT_MP_APP_SECRET,
 )
-from app.wechat_mp_client import jscode2session
+from app.wechat_mp_client import jscode2session, get_phone_number
 from fb_common import validate_password_strength
 
 auth_bp = Blueprint("auth", __name__)
@@ -128,11 +129,20 @@ def _normalize_email(email: str) -> str:
     return (email or "").strip().lower()
 
 
+def _new_wechat_username() -> str:
+    """生成不冲突的默认用户名。"""
+    for _ in range(10):
+        candidate = f"wx_{secrets.token_hex(4)}"
+        if not User.query.filter_by(username=candidate).first():
+            return candidate
+    return f"wx_{int(datetime.now().timestamp())}"
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     """
-    注册：用户名、性别、密码、手机号、邮箱、验证码。
-    请求体: { "username", "gender", "password", "phone", "email", "code" }
+    注册：用户名、性别、密码、手机号、邮箱。
+    请求体: { "username", "gender", "password", "phone", "email" }
     """
     data = request.get_json() or {}
     username = (data.get("username") or "").strip()
@@ -140,7 +150,6 @@ def register():
     password = (data.get("password") or "").strip()
     phone = _normalize_phone(data.get("phone") or "")
     email = _normalize_email(data.get("email") or "")
-    code = (data.get("code") or "").strip()
 
     if not username:
         return jsonify({"ok": False, "message": "请输入用户名"}), 400
@@ -153,19 +162,6 @@ def register():
         return jsonify({"ok": False, "message": "请输入 11 位有效手机号"}), 400
     if not email or "@" not in email:
         return jsonify({"ok": False, "message": "请输入有效的邮箱地址"}), 400
-    if not code:
-        return jsonify({"ok": False, "message": "请输入验证码"}), 400
-
-    now = datetime.now()
-    rec = (
-        VerificationCode.query.filter_by(phone=phone, code=code)
-        .filter(VerificationCode.used_at.is_(None))
-        .filter(VerificationCode.expires_at > now)
-        .order_by(VerificationCode.created_at.desc())
-        .first()
-    )
-    if not rec:
-        return jsonify({"ok": False, "message": "验证码错误或已过期"}), 400
 
     if User.query.filter_by(phone=phone).first():
         return jsonify({"ok": False, "message": "该手机号已注册"}), 409
@@ -184,7 +180,6 @@ def register():
             password_hash=password_hash,
         )
         db.session.add(user)
-        rec.used_at = now
         db.session.commit()
 
         # 新用户赠送周会员（设计书：仅限一次，账号维度）
@@ -250,6 +245,100 @@ def login():
     # 单设备登录：每次登录成功都提升会话版本，使旧 token 立即失效
     user.session_version = int(user.session_version or 1) + 1
     db.session.commit()
+
+    token = _create_token(user.id, int(user.session_version))
+    return jsonify({
+        "ok": True,
+        "user": user.to_dict(),
+        "token": token,
+    })
+
+
+@auth_bp.route("/wechat-mp/quick-login", methods=["POST"])
+def wechat_mp_quick_login():
+    """
+    微信小程序一键登录/注册：
+    1) wx.login 的 code 换 openid
+    2) getPhoneNumber 的 code 换手机号
+    3) 依据 openid/phone 自动注册或登录并返回平台 token
+    Body: { "login_code": "...", "phone_code": "..." }
+    """
+    data = request.get_json() or {}
+    login_code = (data.get("login_code") or "").strip()
+    phone_code = (data.get("phone_code") or "").strip()
+    if not login_code:
+        return jsonify({"ok": False, "message": "缺少 login_code"}), 400
+    if not phone_code:
+        return jsonify({"ok": False, "message": "缺少 phone_code"}), 400
+    if not WECHAT_MP_APP_ID or not WECHAT_MP_APP_SECRET:
+        return jsonify({
+            "ok": False,
+            "message": "服务端未配置 WECHAT_MP_APP_ID / WECHAT_MP_APP_SECRET",
+        }), 503
+
+    sess = jscode2session(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, login_code)
+    errcode = sess.get("errcode")
+    if errcode not in (None, 0):
+        return jsonify({
+            "ok": False,
+            "message": sess.get("errmsg") or f"微信登录失败 errcode={errcode}",
+        }), 400
+    openid = (sess.get("openid") or "").strip()
+    if not openid:
+        return jsonify({"ok": False, "message": "微信未返回 openid"}), 400
+
+    phone_ret = get_phone_number(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, phone_code)
+    errcode = phone_ret.get("errcode")
+    if errcode not in (None, 0):
+        return jsonify({
+            "ok": False,
+            "message": phone_ret.get("errmsg") or f"获取手机号失败 errcode={errcode}",
+        }), 400
+    pinfo = phone_ret.get("phone_info") or {}
+    phone = _normalize_phone(
+        pinfo.get("purePhoneNumber") or pinfo.get("phoneNumber") or ""
+    )
+    if not _is_valid_phone(phone):
+        return jsonify({"ok": False, "message": "微信未返回有效手机号"}), 400
+
+    try:
+        user = User.query.filter_by(wechat_mp_openid=openid).first()
+        if user:
+            if user.phone != phone:
+                other = User.query.filter_by(phone=phone).first()
+                if other and other.id != user.id:
+                    return jsonify({
+                        "ok": False,
+                        "message": "该微信与当前手机号存在冲突，请先使用手机号登录后再绑定",
+                    }), 409
+                user.phone = phone
+        else:
+            user = User.query.filter_by(phone=phone).first()
+            if user:
+                user.wechat_mp_openid = openid
+            else:
+                user = User(
+                    username=_new_wechat_username(),
+                    gender="其他",
+                    phone=phone,
+                    email=None,
+                    password_hash=None,
+                    wechat_mp_openid=openid,
+                )
+                db.session.add(user)
+                db.session.flush()
+                try:
+                    grant_free_week(user.id)
+                except Exception as e:
+                    if hasattr(request, "app") and request.app.logger:
+                        request.app.logger.exception("微信快捷注册赠送周会员失败: %s", e)
+
+        user.session_version = int(user.session_version or 1) + 1
+        db.session.commit()
+    except Exception as e:
+        if hasattr(request, "app") and request.app.logger:
+            request.app.logger.exception("微信快捷登录失败: %s", e)
+        return jsonify({"ok": False, "message": "服务器错误，请稍后重试"}), 500
 
     token = _create_token(user.id, int(user.session_version))
     return jsonify({

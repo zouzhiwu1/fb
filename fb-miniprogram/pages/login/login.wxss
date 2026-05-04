@@ -19,3 +19,24 @@
 .ph {
   color: #6b7280;
 }
+
+.btn-wechat {
+  margin-top: 20rpx;
+  width: 100%;
+  border: 1px solid #22c55e;
+  background: #052e16;
+  color: #86efac;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 20rpx 0;
+  line-height: 1.2;
+}
+
+.btn-wechat::after {
+  border: none;
+}
+
+.btn-wechat.disabled {
+  opacity: 0.65;
+}

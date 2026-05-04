@@ -91,6 +91,37 @@ function bindWechatMp() {
   });
 }
 
+/**
+ * 微信小程序一键登录（wx.login + getPhoneNumber）。
+ */
+function quickLoginWechatMp(phoneCode) {
+  return new Promise((resolve, reject) => {
+    if (!phoneCode) {
+      reject(new Error('缺少手机号授权 code'));
+      return;
+    }
+    wx.login({
+      success: (r) => {
+        const loginCode = (r && r.code) || '';
+        if (!loginCode) {
+          reject(new Error('微信登录失败，请重试'));
+          return;
+        }
+        request('/api/auth/wechat-mp/quick-login', {
+          method: 'POST',
+          data: {
+            login_code: loginCode,
+            phone_code: phoneCode,
+          },
+        })
+          .then(resolve)
+          .catch(reject);
+      },
+      fail: () => reject(new Error('微信登录失败，请重试')),
+    });
+  });
+}
+
 function curveImageUrl(date, filename) {
   return `${API_BASE}/api/curves/img/${date}/${encodeURIComponent(filename)}`;
 }
@@ -123,6 +154,7 @@ module.exports = {
   setSession,
   clearSession,
   bindWechatMp,
+  quickLoginWechatMp,
   curveImageUrl,
   downloadAuthorizedFile,
 };

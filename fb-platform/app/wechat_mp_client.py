@@ -20,6 +20,8 @@ from app.wechat_notify import sign_v2_md5, xml_body_to_dict
 logger = logging.getLogger(__name__)
 
 CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
+ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token"
+GET_PHONE_NUMBER_URL = "https://api.weixin.qq.com/wxa/business/getuserphonenumber"
 UNIFIEDORDER_URL = "https://api.mch.weixin.qq.com/pay/unifiedorder"
 
 
@@ -51,6 +53,54 @@ def jscode2session(app_id: str, app_secret: str, js_code: str) -> dict[str, Any]
         return r.json()
     except Exception as e:
         logger.exception("jscode2session request failed: %s", e)
+        return {"errcode": -1, "errmsg": str(e)}
+
+
+def _get_access_token(app_id: str, app_secret: str) -> dict[str, Any]:
+    """获取小程序接口调用 access_token。"""
+    try:
+        r = requests.get(
+            ACCESS_TOKEN_URL,
+            params={
+                "grant_type": "client_credential",
+                "appid": app_id,
+                "secret": app_secret,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        logger.exception("get access_token failed: %s", e)
+        return {"errcode": -1, "errmsg": str(e)}
+
+
+def get_phone_number(app_id: str, app_secret: str, phone_code: str) -> dict[str, Any]:
+    """
+    使用 getPhoneNumber 返回的 code 换取手机号。
+    文档：wxa/business/getuserphonenumber
+    """
+    tk = _get_access_token(app_id, app_secret)
+    errcode = tk.get("errcode")
+    if errcode not in (None, 0):
+        return {
+            "errcode": errcode,
+            "errmsg": tk.get("errmsg") or "获取 access_token 失败",
+        }
+    access_token = (tk.get("access_token") or "").strip()
+    if not access_token:
+        return {"errcode": -1, "errmsg": "获取 access_token 失败"}
+    try:
+        r = requests.post(
+            GET_PHONE_NUMBER_URL,
+            params={"access_token": access_token},
+            json={"code": phone_code},
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        logger.exception("get user phone number failed: %s", e)
         return {"errcode": -1, "errmsg": str(e)}
 
 

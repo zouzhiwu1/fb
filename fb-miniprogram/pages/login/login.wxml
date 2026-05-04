@@ -12,5 +12,15 @@
     {{loading ? '登录中…' : '登录'}}
   </view>
 
+  <button
+    class="btn-wechat {{loading ? 'disabled' : ''}}"
+    loading="{{loading}}"
+    disabled="{{loading}}"
+    open-type="getPhoneNumber"
+    bindgetphonenumber="onWechatQuickLogin"
+  >
+    微信一键登录
+  </button>
+
   <navigator url="/pages/register/register" open-type="navigate" class="link">没有账号？去注册</navigator>
 </view>
