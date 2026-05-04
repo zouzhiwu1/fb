@@ -1,7 +1,7 @@
 {
   "miniprogramRoot": "./",
   "projectname": "fb-miniprogram",
-  "description": "绿茵战术前瞻微信小程序，与 fb-mobile 功能对齐",
+  "description": "赛事信息助手微信小程序，与 fb-mobile 功能对齐",
   "appid": "wx38c79bc568eeda9a",
   "setting": {
     "urlCheck": true,

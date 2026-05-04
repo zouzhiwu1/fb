@@ -158,7 +158,7 @@ curl -X POST \
   -d '{
     "appid" : "wx38c79bc568eeda9a",
     "mchid" : "1744405455",
-    "description" : "绿茵战术前瞻",
+    "description" : "赛事信息助手",
     "out_trade_no" : "1217752501201407033233368018",
     "time_expire" : "2018-06-08T10:34:56+08:00",
     "attach" : "自定义数据说明",

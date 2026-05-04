@@ -10,7 +10,7 @@
     "pages/records/records"
   ],
   "window": {
-    "navigationBarTitleText": "绿茵战术前瞻",
+    "navigationBarTitleText": "赛事信息助手",
     "navigationBarBackgroundColor": "#050816",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#050816",
