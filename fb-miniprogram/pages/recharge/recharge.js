@@ -58,9 +58,19 @@ Page({
               wx.showToast({ title: '支付成功', icon: 'success' });
             },
             fail: (err) => {
-              const msg =
+              const raw =
                 (err && err.errMsg) ||
-                (typeof err === 'string' ? err : '支付未完成');
+                (typeof err === 'string' ? err : '') ||
+                '';
+              let msg = '支付未完成';
+              if (
+                /requestPayment:fail\s*cancel/i.test(raw) ||
+                /cancel/i.test(raw)
+              ) {
+                msg = '您已取消支付';
+              } else if (raw) {
+                msg = raw;
+              }
               wx.showModal({
                 title: '支付',
                 content: msg,
