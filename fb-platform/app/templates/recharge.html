@@ -29,6 +29,14 @@
   .pay-card:hover { border-color: #93c5fd; }
   .pay-card.selected { border-color: #2563eb; background: #eff6ff; }
   .pay-card input { width: 16px; height: 16px; }
+  .pay-card.disabled {
+    color: #94a3b8;
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    cursor: not-allowed;
+  }
+  .pay-card.disabled:hover { border-color: #e2e8f0; }
+  .pay-note { color: #64748b; font-size: 13px; margin-top: -8px; margin-bottom: 16px; }
   .order-box {
     margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 10px;
     border: 1px solid #e2e8f0; font-size: 14px;
@@ -57,22 +65,23 @@
   </div>
   <h1>会员充值</h1>
   <div class="recharge-main">
-  <p class="hint">选择会员档位后创建订单。支付成功后将通过系统回调自动开通会员（与支付宝 / 微信对接说明见 README）。</p>
+  <p class="hint">选择会员档位后创建微信支付订单。支付成功后将通过系统回调自动开通会员。</p>
 
   <h2>选择档位</h2>
   <div id="options-loading" class="hint">加载价格…</div>
   <div id="options-area" style="display:none;"></div>
   <h2>支付方式</h2>
   <div class="pay-list" id="pay-list">
-    <label class="pay-card selected">
-      <input type="radio" name="pay-channel" value="alipay" checked>
-      <span>支付宝</span>
+    <label class="pay-card disabled" title="暂未开放">
+      <input type="radio" name="pay-channel" value="alipay" disabled>
+      <span>支付宝（暂未开放）</span>
     </label>
-    <label class="pay-card">
-      <input type="radio" name="pay-channel" value="wechat_mp">
+    <label class="pay-card selected">
+      <input type="radio" name="pay-channel" value="wechat_mp" checked>
       <span>微信</span>
     </label>
   </div>
+  <p class="pay-note">当前仅开放微信支付，支付宝即将上线。</p>
   <button type="button" class="primary" id="btn-create" disabled>创建订单</button>
   <div id="msg" class="msg section-msg" style="display:none;"></div>
 
@@ -87,15 +96,12 @@
       <dd id="r-amount"></dd>
       <dt>支付方式</dt>
       <dd id="r-channel"></dd>
-      <dt>支付宝异步通知地址</dt>
-      <dd class="mono" id="r-alipay-url"></dd>
       <dt>微信异步通知地址</dt>
       <dd class="mono" id="r-wechat-url"></dd>
     </dl>
     <div class="mock-block" id="mock-hint">
       <strong>本地 / 测试环境（mock）</strong>
-      <p style="margin:8px 0 0 0;">真实生产需由服务端调起支付宝、微信收银台。联调时可使用仓库内脚本模拟支付成功回调：</p>
-      <code id="cmd-alipay"></code>
+      <p style="margin:8px 0 0 0;">真实生产需由服务端调起微信收银台。联调时可使用仓库内脚本模拟支付成功回调：</p>
       <code id="cmd-wechat" style="margin-top:10px;"></code>
       <p style="margin:10px 0 0 0;">执行后请到 <a href="/membership">会员信息</a> 或 <a href="/recharge-records">充值信息</a> 查看是否已支付。</p>
     </div>
@@ -111,7 +117,7 @@
     return;
   }
   var selectedType = null;
-  var selectedChannel = 'alipay';
+  var selectedChannel = 'wechat_mp';
   var authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
   function showMsg(text, isError) {
@@ -200,15 +206,9 @@
         document.getElementById('r-out-no').textContent = d.out_trade_no;
         document.getElementById('r-subject').textContent = d.subject;
         document.getElementById('r-amount').textContent = d.total_amount;
-        document.getElementById('r-channel').textContent = (d.payment_channel === 'wechat_mp') ? '微信' : '支付宝';
-        document.getElementById('r-alipay-url').textContent = d.notify_url || '';
+        document.getElementById('r-channel').textContent = '微信';
         document.getElementById('r-wechat-url').textContent = d.wechat_notify_url || '';
         var origin = window.location.origin;
-        var mockAlipay = 'cd fb-platform && python3 scripts/simulate_alipay_notify.py \\\n  --base-url ' + origin + ' \\\n  --out-trade-no ' + d.out_trade_no + ' \\\n  --total-amount ' + d.total_amount;
-        if (d.simulate && d.simulate.needs_mock_header && d.simulate.header_name) {
-          mockAlipay += ' \\\n  --mock-secret <你的 ' + d.simulate.header_name + '>';
-        }
-        document.getElementById('cmd-alipay').textContent = mockAlipay;
         var mockWx = 'cd fb-platform && python3 scripts/simulate_wechat_notify.py \\\n  --base-url ' + origin + ' \\\n  --out-trade-no ' + d.out_trade_no + ' \\\n  --total-amount ' + d.total_amount;
         if (d.wechat && d.wechat.simulate && d.wechat.simulate.needs_mock_header) {
           mockWx += ' \\\n  --mock-secret <你的 ' + (d.wechat.simulate.header_name || 'X-Wechat-Mock-Secret') + '>';

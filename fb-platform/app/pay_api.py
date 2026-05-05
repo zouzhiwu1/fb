@@ -140,7 +140,7 @@ def create_order():
     """
     创建会员购买订单（需登录）。
     Body:
-      - { "membership_type": "month" } 默认支付宝侧自行收银台（与历史行为一致）
+      - { "membership_type": "month" } 默认走 wechat_mp
       - { "membership_type": "month", "payment_channel": "wechat_mp" } 微信小程序 JSAPI 支付，
         成功时返回 wx_pay 供 wx.requestPayment；需用户已绑定 openid（POST /api/auth/wechat-mp/bind）。
     """
@@ -151,11 +151,11 @@ def create_order():
         ), 401
     data = request.get_json() or {}
     mtype = (data.get("membership_type") or "").strip().lower()
-    payment_channel = (data.get("payment_channel") or "alipay").strip().lower()
-    if payment_channel not in ("alipay", "wechat_mp"):
+    payment_channel = (data.get("payment_channel") or "wechat_mp").strip().lower()
+    if payment_channel != "wechat_mp":
         return jsonify({
             "ok": False,
-            "message": 'payment_channel 须为 alipay 或 wechat_mp',
+            "message": "暂不支持支付宝，请使用微信支付",
         }), 400
     if mtype not in MEMBERSHIP_TYPES:
         return jsonify({
