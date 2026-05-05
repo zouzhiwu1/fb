@@ -176,7 +176,7 @@ def unifiedorder_mweb(
     total_fee_fen: int,
     notify_url: str,
     client_ip: str,
-    wap_name: str = "赛事信息助手",
+    wap_name: str = "赛果信息助手",
     wap_url: str = "https://example.com",
 ) -> tuple[str | None, str | None]:
     """
@@ -187,7 +187,7 @@ def unifiedorder_mweb(
     nonce_str = secrets.token_hex(16)
     scene_info = (
         '{"h5_info":{"type":"Wap","wap_url":"%s","wap_name":"%s"}}'
-        % ((wap_url or "https://example.com")[:128], (wap_name or "赛事信息助手")[:32])
+        % ((wap_url or "https://example.com")[:128], (wap_name or "赛果信息助手")[:32])
     )
     params: dict[str, str] = {
         "appid": app_id,

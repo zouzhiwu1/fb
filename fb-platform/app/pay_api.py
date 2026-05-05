@@ -357,7 +357,7 @@ def create_order():
                     total_fee_fen=total_fen,
                     notify_url=wechat_notify_url,
                     client_ip=client_ip,
-                    wap_name="赛事信息助手",
+                    wap_name="赛果信息助手",
                     wap_url=PUBLIC_BASE_URL,
                 )
                 if not h5_url:
