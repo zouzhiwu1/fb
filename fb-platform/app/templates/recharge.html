@@ -37,6 +37,7 @@
   }
   .pay-card.disabled:hover { border-color: #e2e8f0; }
   .pay-note { color: #64748b; font-size: 13px; margin-top: -8px; margin-bottom: 16px; }
+  .pay-tip { margin-top: 10px; font-size: 13px; }
   .order-box {
     margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 10px;
     border: 1px solid #e2e8f0; font-size: 14px;
@@ -65,7 +66,7 @@
   </div>
   <h1>会员充值</h1>
   <div class="recharge-main">
-  <p class="hint">选择会员档位后创建微信支付订单。支付成功后将通过系统回调自动开通会员。</p>
+  <p class="hint">选择会员档位与支付方式后创建订单。支付成功后将通过系统回调自动开通会员。</p>
 
   <h2>选择档位</h2>
   <div id="options-loading" class="hint">加载价格…</div>
@@ -77,11 +78,15 @@
       <span>支付宝（暂未开放）</span>
     </label>
     <label class="pay-card selected">
-      <input type="radio" name="pay-channel" value="wechat_mp" checked>
-      <span>微信</span>
+      <input type="radio" name="pay-channel" value="wechat_h5" checked>
+      <span>微信（网页）</span>
+    </label>
+    <label class="pay-card">
+      <input type="radio" name="pay-channel" value="wechat_mp">
+      <span>微信（小程序）</span>
     </label>
   </div>
-  <p class="pay-note">当前仅开放微信支付，支付宝即将上线。</p>
+  <p class="pay-note">当前仅开放微信支付；网页推荐使用“微信（网页）”，小程序场景使用“微信（小程序）”。</p>
   <button type="button" class="primary" id="btn-create" disabled>创建订单</button>
   <div id="msg" class="msg section-msg" style="display:none;"></div>
 
@@ -98,6 +103,8 @@
       <dd id="r-channel"></dd>
       <dt>微信异步通知地址</dt>
       <dd class="mono" id="r-wechat-url"></dd>
+      <dt id="r-h5-url-label" style="display:none;">微信网页支付链接</dt>
+      <dd class="mono" id="r-h5-url" style="display:none;"></dd>
     </dl>
     <div class="mock-block" id="mock-hint">
       <strong>本地 / 测试环境（mock）</strong>
@@ -105,6 +112,7 @@
       <code id="cmd-wechat" style="margin-top:10px;"></code>
       <p style="margin:10px 0 0 0;">执行后请到 <a href="/membership">会员信息</a> 或 <a href="/recharge-records">充值信息</a> 查看是否已支付。</p>
     </div>
+    <p id="pay-tip" class="pay-tip hint" style="display:none;"></p>
   </div>
   </div>
 {% endblock %}
@@ -117,7 +125,7 @@
     return;
   }
   var selectedType = null;
-  var selectedChannel = 'wechat_mp';
+  var selectedChannel = 'wechat_h5';
   var authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
   function showMsg(text, isError) {
@@ -206,14 +214,30 @@
         document.getElementById('r-out-no').textContent = d.out_trade_no;
         document.getElementById('r-subject').textContent = d.subject;
         document.getElementById('r-amount').textContent = d.total_amount;
-        document.getElementById('r-channel').textContent = '微信';
+        document.getElementById('r-channel').textContent = (d.payment_channel === 'wechat_mp') ? '微信（小程序）' : '微信（网页）';
         document.getElementById('r-wechat-url').textContent = d.wechat_notify_url || '';
+        var h5Label = document.getElementById('r-h5-url-label');
+        var h5Val = document.getElementById('r-h5-url');
+        var payTip = document.getElementById('pay-tip');
+        h5Label.style.display = 'none';
+        h5Val.style.display = 'none';
+        payTip.style.display = 'none';
         var origin = window.location.origin;
         var mockWx = 'cd fb-platform && python3 scripts/simulate_wechat_notify.py \\\n  --base-url ' + origin + ' \\\n  --out-trade-no ' + d.out_trade_no + ' \\\n  --total-amount ' + d.total_amount;
         if (d.wechat && d.wechat.simulate && d.wechat.simulate.needs_mock_header) {
           mockWx += ' \\\n  --mock-secret <你的 ' + (d.wechat.simulate.header_name || 'X-Wechat-Mock-Secret') + '>';
         }
         document.getElementById('cmd-wechat').textContent = mockWx;
+        if (d.payment_channel === 'wechat_h5' && d.h5_url) {
+          h5Label.style.display = '';
+          h5Val.style.display = '';
+          h5Val.textContent = d.h5_url;
+          payTip.style.display = 'block';
+          payTip.textContent = '即将跳转到微信收银台...';
+          setTimeout(function() {
+            window.location.href = d.h5_url;
+          }, 350);
+        }
         showMsg('订单已创建', false);
         btn.disabled = false;
         document.getElementById('order-result').scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -166,6 +166,66 @@ def unifiedorder_jsapi(
     return prepay_id, None
 
 
+def unifiedorder_mweb(
+    *,
+    app_id: str,
+    mch_id: str,
+    api_key: str,
+    out_trade_no: str,
+    body: str,
+    total_fee_fen: int,
+    notify_url: str,
+    client_ip: str,
+    wap_name: str = "赛事信息助手",
+    wap_url: str = "https://example.com",
+) -> tuple[str | None, str | None]:
+    """
+    统一下单 H5（MWEB）。成功返回 (mweb_url, None)，失败返回 (None, err_msg)。
+    """
+    if len(out_trade_no) > 32:
+        return None, "out_trade_no 超过微信 32 字节限制"
+    nonce_str = secrets.token_hex(16)
+    scene_info = (
+        '{"h5_info":{"type":"Wap","wap_url":"%s","wap_name":"%s"}}'
+        % ((wap_url or "https://example.com")[:128], (wap_name or "赛事信息助手")[:32])
+    )
+    params: dict[str, str] = {
+        "appid": app_id,
+        "mch_id": mch_id,
+        "nonce_str": nonce_str,
+        "body": (body or "会员")[:127],
+        "out_trade_no": out_trade_no,
+        "total_fee": str(int(total_fee_fen)),
+        "spbill_create_ip": (client_ip or "127.0.0.1").strip()[:45],
+        "notify_url": notify_url[:255],
+        "trade_type": "MWEB",
+        "scene_info": scene_info,
+    }
+    params["sign"] = sign_v2_md5(params, api_key)
+    xml_body = _dict_to_xml(params)
+    try:
+        resp = requests.post(
+            UNIFIEDORDER_URL,
+            data=xml_body.encode("utf-8"),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = xml_body_to_dict(resp.text)
+    except Exception as e:
+        logger.exception("unifiedorder mweb failed: %s", e)
+        return None, str(e)
+
+    if (data.get("return_code") or "").upper() != "SUCCESS":
+        return None, data.get("return_msg") or "通信失败"
+    if (data.get("result_code") or "").upper() != "SUCCESS":
+        return None, data.get("err_code_des") or data.get("err_code") or "业务失败"
+    mweb_url = (data.get("mweb_url") or "").strip()
+    if not mweb_url:
+        return None, "无 mweb_url"
+    return mweb_url, None
+
+
 def build_miniprogram_request_payment_params(
     *,
     app_id: str,

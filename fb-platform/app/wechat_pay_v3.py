@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 MCH_HOST = "https://api.mch.weixin.qq.com"
 JSAPI_PREPAY_PATH = "/v3/pay/transactions/jsapi"
+H5_PREPAY_PATH = "/v3/pay/transactions/h5"
 
 
 def _header(headers: Any, name: str) -> str | None:
@@ -241,6 +242,94 @@ def jsapi_prepay(
         if not prepay_id:
             return None, "无 prepay_id"
         return prepay_id, None
+
+    try:
+        err = json.loads(text)
+        msg = err.get("message") or err.get("detail") or text
+        code = err.get("code", "")
+        return None, f"{code} {msg}".strip() if code else (msg or f"HTTP {resp.status_code}")
+    except json.JSONDecodeError:
+        return None, text[:500] or f"HTTP {resp.status_code}"
+
+
+def h5_prepay(
+    *,
+    app_id: str,
+    mch_id: str,
+    mch_cert_serial: str,
+    merchant_private_key: Any,
+    platform_public_key: Any,
+    platform_public_key_id: str,
+    out_trade_no: str,
+    description: str,
+    notify_url: str,
+    total_fen: int,
+    client_ip: str,
+    timeout_sec: int = 15,
+) -> tuple[str | None, str | None]:
+    """
+    POST /v3/pay/transactions/h5，成功返回 (h5_url, None)。
+    """
+    if len(out_trade_no) > 32:
+        return None, "out_trade_no 超过微信 32 字节限制"
+    if total_fen <= 0:
+        return None, "订单金额无效"
+    body_obj: dict[str, Any] = {
+        "appid": app_id,
+        "mchid": mch_id,
+        "description": (description or "订单")[:127],
+        "out_trade_no": out_trade_no,
+        "notify_url": (notify_url or "").strip()[:255],
+        "amount": {"total": int(total_fen), "currency": "CNY"},
+        "scene_info": {
+            "payer_client_ip": (client_ip or "127.0.0.1").strip()[:45],
+            "h5_info": {"type": "Wap"},
+        },
+    }
+    body = json.dumps(body_obj, separators=(",", ":"), ensure_ascii=False)
+    auth = build_authorization(
+        mchid=mch_id,
+        cert_serial_no=mch_cert_serial,
+        private_key=merchant_private_key,
+        method="POST",
+        url_path=H5_PREPAY_PATH,
+        body=body,
+    )
+    url = MCH_HOST + H5_PREPAY_PATH
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": auth,
+        "User-Agent": "fb-platform-wechatpay-v3",
+    }
+    if platform_public_key_id:
+        headers["Wechatpay-Serial"] = platform_public_key_id
+    try:
+        resp = requests.post(
+            url,
+            data=body.encode("utf-8"),
+            headers=headers,
+            timeout=timeout_sec,
+        )
+    except requests.RequestException as e:
+        logger.exception("wechat v3 h5 prepay request failed: %s", e)
+        return None, str(e)
+
+    text = resp.text or ""
+    if 200 <= resp.status_code < 300:
+        try:
+            _verify_response_signature(resp, platform_public_key)
+        except ValueError as e:
+            logger.warning("%s", e)
+            return None, str(e)
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return None, "应答非 JSON"
+        h5_url = (data.get("h5_url") or "").strip()
+        if not h5_url:
+            return None, "无 h5_url"
+        return h5_url, None
 
     try:
         err = json.loads(text)
