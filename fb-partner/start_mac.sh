@@ -10,6 +10,9 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 PY="${ROOT}/.venv/bin/python"
+PIP="${ROOT}/.venv/bin/pip"
+REQ_FILE="${ROOT}/requirements.txt"
+REQ_STAMP="${ROOT}/.venv/.requirements.sha256"
 LOG_PARENT="$(cd "${ROOT}/.." && pwd)"
 LOG_DIR="${LOG_PARENT}/fb-log"
 DAY="$(date +%Y%m%d)"
@@ -19,9 +22,30 @@ mkdir -p "$(dirname "$PARTNER_LOG")"
 export PORT="${PORT:-5002}"
 
 if [[ ! -x "$PY" ]]; then
-  echo "未找到 ${PY}。请先:" >&2
-  echo "  cd \"${ROOT}\" && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2
-  exit 1
+  echo "未发现虚拟环境，正在创建 .venv ..."
+  python3 -m venv .venv
+fi
+
+if [[ ! -x "$PIP" ]]; then
+  echo "未发现 pip，正在修复虚拟环境 ..."
+  "$PY" -m ensurepip --upgrade
+fi
+
+need_install=0
+if [[ ! -f "$REQ_STAMP" ]]; then
+  need_install=1
+elif [[ -f "$REQ_FILE" ]]; then
+  current_sha="$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')"
+  installed_sha="$(cat "$REQ_STAMP" 2>/dev/null || true)"
+  if [[ "$current_sha" != "$installed_sha" ]]; then
+    need_install=1
+  fi
+fi
+
+if [[ "$need_install" -eq 1 ]]; then
+  echo "正在安装/更新依赖 ..."
+  "$PIP" install -r "$REQ_FILE"
+  shasum -a 256 "$REQ_FILE" | awk '{print $1}' > "$REQ_STAMP"
 fi
 
 PID_FILE="${ROOT}/.partner.pid"

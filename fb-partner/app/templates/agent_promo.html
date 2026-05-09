@@ -89,7 +89,9 @@
         j.channels.forEach(function (ch) {
           var qEl = document.getElementById('promo_qr_' + ch.id);
           var mEl = document.getElementById('promo_meta_' + ch.id);
-          if (ch.qr_url && typeof QRCode !== 'undefined') {
+          if (ch.qr_image_data_url) {
+            qEl.innerHTML = '<img alt="推广二维码" src="' + esc(ch.qr_image_data_url) + '" />';
+          } else if (ch.qr_url && typeof QRCode !== 'undefined') {
             try {
               new QRCode(qEl, {
                 text: ch.qr_url,
@@ -106,6 +108,9 @@
           var parts = [];
           if (ch.qr_url) {
             parts.push('<span class="muted" style="font-size:11px;">链接</span><code>' + esc(ch.qr_url) + '</code>');
+          }
+          if (ch.qr_image_data_url && ch.id === 'miniprogram') {
+            parts.push('<span class="muted" style="font-size:11px;">类型</span><code>微信小程序码（包含 agent_id）</code>');
           }
           if (ch.id === 'miniprogram') {
             if (ch.miniprogram_path) {

@@ -201,6 +201,12 @@ def test_partner_promo_links(client, monkeypatch):
         "PARTNER_PROMO_IOS_URL",
         "https://apps.apple.com/app/id1?c={agent_code}",
     )
+    monkeypatch.setenv("PARTNER_PROMO_MP_APP_ID", "wx-test")
+    monkeypatch.setenv("PARTNER_PROMO_MP_APP_SECRET", "sec-test")
+    monkeypatch.setattr(
+        "app.dashboard._generate_partner_miniprogram_qr_image_data_url",
+        lambda agent_id: f"data:image/png;base64,MOCK{agent_id}",
+    )
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-agent",
@@ -227,8 +233,8 @@ def test_partner_promo_links(client, monkeypatch):
     assert body.get("agent_code") == "PROMO1"
     aid = str(body.get("agent_id"))
     ch = {c["id"]: c for c in body["channels"]}
-    assert "miniprogram" in ch and ch["miniprogram"]["qr_url"].startswith("https://h5.example.com/mp?")
-    assert aid in ch["miniprogram"]["qr_url"] and "PROMO1" in ch["miniprogram"]["qr_url"]
+    assert "miniprogram" in ch and ch["miniprogram"]["qr_image_data_url"].startswith("data:image/png;base64,")
+    assert aid in ch["miniprogram"]["qr_image_data_url"]
     assert "web" in ch and ch["web"]["qr_url"].startswith("https://h5.example.com/register?")
     assert aid in ch["web"]["qr_url"] and "PROMO1" in ch["web"]["qr_url"]
     assert ch["android"]["qr_url"].startswith("https://dl.example.com/") and aid in ch["android"]["qr_url"]

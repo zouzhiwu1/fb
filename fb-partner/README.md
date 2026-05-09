@@ -87,13 +87,28 @@ curl -s -X POST http://127.0.0.1:5002/api/partner/auth/bootstrap-admin \
 代理商「推广二维码」页支持 4 个渠道：微信小程序、WEB 端、Android、iOS。通过 `.env` 配置：
 
 ```env
-PARTNER_PROMO_MP_QR_TARGET=https://你的域名/invite-mp?agent_id={agent_id}
-PARTNER_PROMO_WEB_URL=https://你的域名/register?ref={agent_id}
-PARTNER_PROMO_ANDROID_URL=https://你的域名/downloads/fb.apk?ref={agent_id}
+PARTNER_PROMO_MP_QR_TARGET=https://trybx.cn/invite-mp?agent_id={agent_id}
+PARTNER_PROMO_WEB_URL=https://trybx.cn/register?ref={agent_id}
+PARTNER_PROMO_ANDROID_URL=https://trybx.cn/downloads/fb.apk?ref={agent_id}
 PARTNER_PROMO_IOS_URL=https://apps.apple.com/cn/app/idXXXX?ref={agent_id}
 ```
 
 模板变量支持 `{agent_id}` 与 `{agent_code}`。
+
+### 微信小程序推广码（方案 B：自动生成代理专属小程序码）
+
+若希望「微信小程序」卡片二维码扫码直接进入小程序，并携带 `agent_id`，可在 `.env` 额外配置：
+
+```env
+PARTNER_PROMO_MP_APP_ID=你的小程序AppID
+PARTNER_PROMO_MP_APP_SECRET=你的小程序AppSecret
+PARTNER_PROMO_MP_ENTRY_PAGE=pages/register/register
+PARTNER_PROMO_MP_CODE_ENV_VERSION=trial
+```
+
+配置后，`/api/partner/stats/promo-links` 会优先调用微信 `getwxacodeunlimit` 生成包含 `scene=agent_id` 的小程序码图片并直接展示；失败时回退到 `PARTNER_PROMO_MP_QR_TARGET`（若已配置）。
+
+注意：小程序若尚未发布线上版本，微信接口会返回 `errcode=85079`（`miniprogram has no online release`），此时需先发布线上版本，或临时使用体验版二维码联调。
 
 ## 首个代理商（仅运维/无管理员时的捷径）
 

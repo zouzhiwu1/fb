@@ -68,6 +68,21 @@ PARTNER_LEDGER_EVENT_TYPES_REG = tuple(
     if x.strip()
 )
 
+# 微信小程序推广（方案 B）：调用微信接口生成 url_link 再转二维码
+PARTNER_PROMO_MP_APP_ID = os.environ.get("PARTNER_PROMO_MP_APP_ID", "").strip()
+PARTNER_PROMO_MP_APP_SECRET = os.environ.get("PARTNER_PROMO_MP_APP_SECRET", "").strip()
+PARTNER_PROMO_MP_ENTRY_PAGE = os.environ.get(
+    "PARTNER_PROMO_MP_ENTRY_PAGE",
+    "pages/register/register",
+).strip()
+PARTNER_PROMO_MP_CODE_ENV_VERSION = os.environ.get(
+    "PARTNER_PROMO_MP_CODE_ENV_VERSION",
+    "trial",
+).strip()
+PARTNER_PROMO_MP_CODE_WIDTH = int(
+    os.environ.get("PARTNER_PROMO_MP_CODE_WIDTH", "430") or "430"
+)
+
 def _expand_promo_template(template: str, agent_id: int, agent_code: str) -> str:
     if not template or not template.strip():
         return ""
@@ -101,10 +116,7 @@ def partner_promo_bundle(agent_id: int, agent_code: str | None) -> dict:
     web_tpl = os.environ.get("PARTNER_PROMO_WEB_URL", "").strip()
     android_tpl = os.environ.get("PARTNER_PROMO_ANDROID_URL", "").strip()
     ios_tpl = os.environ.get("PARTNER_PROMO_IOS_URL", "").strip()
-    mp_entry = os.environ.get(
-        "PARTNER_PROMO_MP_ENTRY_PAGE",
-        "pages/register/register",
-    ).strip()
+    mp_entry = PARTNER_PROMO_MP_ENTRY_PAGE
 
     mp_url = _expand_promo_template(mp_tpl, agent_id, code)
     if not mp_url and h5_base:
