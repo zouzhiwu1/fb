@@ -106,6 +106,8 @@ PARTNER_PROMO_MP_ENTRY_PAGE=pages/register/register
 PARTNER_PROMO_MP_CODE_ENV_VERSION=trial
 ```
 
+若 `PARTNER_PROMO_MP_QR_TARGET` 指向 `https://你的域名/invite-mp?agent_id=…`，该路径由 **fb-platform** 提供（服务器需配置 `WECHAT_MP_APP_ID` 及可选 `INVITE_MP_ENTRY_PAGE` / `INVITE_MP_ENV_VERSION`），且域名 HTTPS 需反代到 platform 进程。
+
 配置后，`/api/partner/stats/promo-links` 会优先调用微信 `getwxacodeunlimit` 生成包含 `scene=agent_id` 的小程序码图片并直接展示；失败时回退到 `PARTNER_PROMO_MP_QR_TARGET`（若已配置）。
 
 注意：小程序若尚未发布线上版本，微信接口会返回 `errcode=85079`（`miniprogram has no online release`），此时需先发布线上版本，或临时使用体验版二维码联调。

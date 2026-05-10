@@ -132,6 +132,13 @@ WECHAT_API_KEY = os.environ.get("WECHAT_API_KEY", "")
 # 微信小程序：开放平台 AppID / AppSecret（jscode2session）；与「公众号」可相同主体下的小程序
 WECHAT_MP_APP_ID = os.environ.get("WECHAT_MP_APP_ID", "").strip()
 WECHAT_MP_APP_SECRET = os.environ.get("WECHAT_MP_APP_SECRET", "").strip()
+# H5 推广链接 /invite-mp 拉起小程序：入口页与版本（与 fb-partner PARTNER_PROMO_MP_* 测试方式一致时建议 trial）
+INVITE_MP_ENTRY_PAGE = os.environ.get(
+    "INVITE_MP_ENTRY_PAGE", "pages/register/register"
+).strip()
+INVITE_MP_ENV_VERSION = os.environ.get(
+    "INVITE_MP_ENV_VERSION", "trial"
+).strip()
 # 微信支付商户号（V2 统一下单 / V3 JSAPI 共用）
 WECHAT_MCH_ID = os.environ.get("WECHAT_MCH_ID", "").strip()
 

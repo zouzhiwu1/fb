@@ -2,7 +2,7 @@
 import logging
 import os
 
-from flask import Flask, jsonify, render_template, redirect, url_for
+from flask import Flask, jsonify, render_template, redirect, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
@@ -99,6 +99,74 @@ def create_app():
     @app.route("/recharge-records")
     def recharge_records_page():
         return render_template("recharge_records.html")
+
+    @app.route("/invite-mp")
+    def invite_mp_page():
+        """
+        代理商 H5 推广落地页（PARTNER_PROMO_MP_QR_TARGET 等示例域名）。
+        在微信内打开时跳转 URL Scheme 拉起小程序注册页，query 带 agent_id。
+        """
+        from urllib.parse import quote
+
+        import config as cfg
+
+        raw = (request.args.get("agent_id") or "").strip()
+        agent_id_val = None
+        if raw:
+            try:
+                agent_id_val = int(raw)
+                if agent_id_val <= 0:
+                    return (
+                        render_template(
+                            "invite_mp.html",
+                            error="参数 agent_id 无效。",
+                        ),
+                        400,
+                    )
+            except ValueError:
+                return (
+                    render_template(
+                        "invite_mp.html",
+                        error="参数 agent_id 无效。",
+                    ),
+                    400,
+                )
+
+        if not cfg.WECHAT_MP_APP_ID:
+            return (
+                render_template(
+                    "invite_mp.html",
+                    error="服务端未配置 WECHAT_MP_APP_ID，无法拉起小程序。请在 platform .env 中配置与小程序一致的 AppID。",
+                ),
+                503,
+            )
+
+        entry = cfg.INVITE_MP_ENTRY_PAGE or "pages/register/register"
+        env_ver = (cfg.INVITE_MP_ENV_VERSION or "trial").strip().lower()
+        if env_ver not in ("release", "trial", "develop"):
+            env_ver = "trial"
+
+        path_enc = quote(entry, safe="")
+        query_str = f"agent_id={agent_id_val}" if agent_id_val is not None else ""
+        query_enc = quote(query_str, safe="") if query_str else ""
+
+        scheme = (
+            "weixin://dl/business/?appid="
+            + quote(cfg.WECHAT_MP_APP_ID, safe="")
+            + "&path="
+            + path_enc
+        )
+        if query_enc:
+            scheme += "&query=" + query_enc
+        scheme += "&env_version=" + quote(env_ver, safe="")
+
+        return render_template(
+            "invite_mp.html",
+            scheme=scheme,
+            agent_id=agent_id_val,
+            entry_page=entry,
+            env_version=env_ver,
+        )
 
     # 勿写 import app.models：在函数内会把局部名 app 绑定成包对象，覆盖 Flask 实例。
     from app import models  # noqa: F401  # 注册全部模型，供 db.create_all() 建表

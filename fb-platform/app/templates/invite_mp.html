@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}打开小程序 — 赛果信息助手{% endblock %}
+{% block content %}
+  {% if error %}
+    <h1 style="font-size: 18px; margin: 0 0 12px;">无法打开小程序</h1>
+    <p class="msg error" style="margin-top: 0;">{{ error }}</p>
+    <p style="font-size: 14px; color: #64748b;">请确认服务器已配置 <code>WECHAT_MP_APP_ID</code>（与微信小程序一致），或由管理员检查链接参数。</p>
+  {% else %}
+    <h1 style="font-size: 18px; margin: 0 0 12px;">正在打开小程序</h1>
+    {% if agent_id is not none %}
+      <p style="font-size: 14px; color: #475569;">推广归属：<strong>agent_id={{ agent_id }}</strong></p>
+    {% endif %}
+    <p style="font-size: 13px; color: #64748b;">入口：<code>{{ entry_page }}</code> · 版本：<code>{{ env_version }}</code></p>
+    <p style="font-size: 14px; color: #334155;">请在<strong>微信</strong>内打开本页；若未自动跳转，点击下方按钮。</p>
+    <p style="margin-top: 20px;">
+      <a id="open-mp" href="{{ scheme }}" class="open-mp-btn">打开小程序</a>
+    </p>
+  {% endif %}
+{% endblock %}
+{% block extra_css %}
+<style>
+  a.open-mp-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    color: #fff !important;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  }
+  a.open-mp-btn:hover { filter: brightness(1.05); }
+  code { font-size: 13px; word-break: break-all; }
+</style>
+{% endblock %}
+{% block extra_js %}
+{% if scheme and not error %}
+<script>
+(function () {
+  var scheme = {{ scheme | tojson }};
+  if (!scheme) return;
+  if (/MicroMessenger/i.test(navigator.userAgent)) {
+    window.location.href = scheme;
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}
