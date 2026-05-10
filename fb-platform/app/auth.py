@@ -10,7 +10,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app import db
-from app.models import User, VerificationCode
+from app.models import Agent, User, VerificationCode
 from app.sms import generate_code, send_sms
 from app.membership import grant_free_week
 from config import (
@@ -138,11 +138,34 @@ def _new_wechat_username() -> str:
     return f"wx_{int(datetime.now().timestamp())}"
 
 
+def _registration_agent_id_or_error(data: dict) -> tuple[int | None, tuple | None]:
+    """
+    解析可选的推广 agent_id；非法或渠道不可用时返回 (None, (jsonify 响应, HTTP 状态码))。
+    未传递 agent_id 时返回 (None, None) 表示自然流量。
+    """
+    raw = data.get("agent_id")
+    if raw is None or raw == "":
+        return None, None
+    try:
+        aid = int(raw)
+    except (TypeError, ValueError):
+        return None, (jsonify({"ok": False, "message": "推广参数无效"}), 400)
+    if aid <= 0:
+        return None, (jsonify({"ok": False, "message": "推广参数无效"}), 400)
+    agent = db.session.get(Agent, aid)
+    if agent is None or (str(agent.status or "").lower() != "active"):
+        return None, (
+            jsonify({"ok": False, "message": "推广渠道无效或已停用"}),
+            400,
+        )
+    return aid, None
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     """
     注册：用户名、性别、密码、手机号、邮箱。
-    请求体: { "username", "gender", "password", "phone", "email" }
+    请求体: { "username", "gender", "password", "phone", "email", "agent_id" 可选 }
     """
     data = request.get_json() or {}
     username = (data.get("username") or "").strip()
@@ -170,6 +193,11 @@ def register():
     if email and User.query.filter_by(email=email).first():
         return jsonify({"ok": False, "message": "该邮箱已被使用"}), 409
 
+    reg_agent_id, agent_err = _registration_agent_id_or_error(data)
+    if agent_err is not None:
+        body, status = agent_err
+        return body, status
+
     try:
         password_hash = generate_password_hash(password, method="pbkdf2:sha256")
         user = User(
@@ -178,6 +206,7 @@ def register():
             phone=phone,
             email=email or None,
             password_hash=password_hash,
+            agent_id=reg_agent_id,
         )
         db.session.add(user)
         db.session.commit()

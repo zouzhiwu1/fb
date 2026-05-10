@@ -61,11 +61,18 @@
     if (pe) { showMsg(pe, true); return; }
     if (!isPhoneValid(phone)) { showMsg('请输入 11 位有效手机号', true); return; }
     if (!email || email.indexOf('@') < 0) { showMsg('请输入有效邮箱', true); return; }
+    var params = new URLSearchParams(window.location.search);
+    var agentRaw = params.get('agent_id');
+    var body = { username: username, gender: gender, password: password, phone: phone, email: email };
+    if (agentRaw) {
+      var an = parseInt(String(agentRaw), 10);
+      if (!isNaN(an) && an > 0) body.agent_id = an;
+    }
     btnSubmit.disabled = true;
     fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username, gender: gender, password: password, phone: phone, email: email })
+      body: JSON.stringify(body)
     })
       .then(function(r) {
         return r.text().then(function(text) {

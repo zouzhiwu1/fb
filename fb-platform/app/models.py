@@ -21,6 +21,8 @@ class User(db.Model):
     free_week_granted_at = db.Column(db.DateTime, nullable=True)
     # 微信小程序支付：jscode2session 得到的 openid（与账号绑定后用于 JSAPI 下单）
     wechat_mp_openid = db.Column(db.String(64), nullable=True, index=True)
+    # 拉新归属代理商 agents.id（与 fb-partner / scripts 扩展列一致；未归因则为空）
+    agent_id = db.Column(db.Integer, nullable=True, index=True)
 
     def to_dict(self):
         return {
@@ -118,3 +120,55 @@ class MembershipRecord(db.Model):
             "source": self.source,
             "order_id": self.order_id,
         }
+
+
+class Agent(db.Model):
+    """代理商档案（与 fb-partner 共用 MySQL 表 agents；用于读取 current_rate 等）。"""
+
+    __tablename__ = "agents"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    agent_code = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    login_name = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    display_name = db.Column(db.String(128), nullable=False, default="")
+    real_name = db.Column(db.String(64), nullable=True)
+    age = db.Column(db.Integer, nullable=True)
+    phone = db.Column(db.String(20), nullable=True, unique=True, index=True)
+    bank_account = db.Column(db.Text(), nullable=True)
+    payout_channel = db.Column(db.String(16), nullable=True)
+    payout_account = db.Column(db.String(256), nullable=True)
+    payout_holder_name = db.Column(db.String(64), nullable=True)
+    contact = db.Column(db.String(128), nullable=True)
+    current_rate = db.Column(
+        db.Numeric(6, 4), nullable=False, default=0
+    )  # 本月充值分润率，如 0.0800 = 8%
+    bank_info = db.Column(db.Text(), nullable=True)
+    status = db.Column(db.String(16), nullable=False, default="active", index=True)
+    session_version = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    settled_commission_yuan = db.Column(
+        db.Numeric(14, 2), nullable=False, default=0
+    )
+
+
+class PointsLedger(db.Model):
+    """代理商积分流水（与 fb-partner 共用表 points_ledger）。"""
+
+    __tablename__ = "points_ledger"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    agent_id = db.Column(
+        db.Integer,
+        db.ForeignKey("agents.id"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(db.Integer, nullable=True, index=True)
+    order_id = db.Column(db.String(64), nullable=True, index=True)
+    event_type = db.Column(db.String(32), nullable=False, index=True)
+    base_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    applied_rate = db.Column(db.Numeric(6, 4), nullable=False, default=0)
+    points_delta = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    settlement_month = db.Column(db.String(7), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)

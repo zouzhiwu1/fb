@@ -1,6 +1,25 @@
 const api = require('../../utils/api.js');
 const { PASSWORD_POLICY_HINT, validatePasswordClient } = require('../../utils/passwordPolicy.js');
 
+function parseAgentIdFromOptions(options) {
+  if (!options) return null;
+  if (options.scene) {
+    var scene = options.scene;
+    try {
+      scene = decodeURIComponent(scene);
+    } catch (e) {
+      /* 非编码串 */
+    }
+    var m = /agent_id=(\d+)/.exec(String(scene));
+    if (m) return parseInt(m[1], 10);
+  }
+  if (options.agent_id) {
+    var n = parseInt(String(options.agent_id), 10);
+    if (!isNaN(n) && n > 0) return n;
+  }
+  return null;
+}
+
 Page({
   data: {
     username: '',
@@ -8,8 +27,16 @@ Page({
     password: '',
     phone: '',
     email: '',
+    agentId: null,
     loading: false,
     passwordPolicyHint: PASSWORD_POLICY_HINT,
+  },
+
+  onLoad(options) {
+    var aid = parseAgentIdFromOptions(options || {});
+    if (aid) {
+      this.setData({ agentId: aid });
+    }
   },
 
   onUsername(e) {
@@ -53,16 +80,20 @@ Page({
       return;
     }
     this.setData({ loading: true });
+    var payload = {
+      username: this.data.username.trim(),
+      gender: this.data.gender,
+      password: this.data.password,
+      phone: this.data.phone.trim(),
+      email: this.data.email.trim(),
+    };
+    if (this.data.agentId) {
+      payload.agent_id = this.data.agentId;
+    }
     api
       .request('/api/auth/register', {
         method: 'POST',
-        data: {
-          username: this.data.username.trim(),
-          gender: this.data.gender,
-          password: this.data.password,
-          phone: this.data.phone.trim(),
-          email: this.data.email.trim(),
-        },
+        data: payload,
       })
       .then(({ ok, data, status }) => {
         if (!ok || !data.ok) {

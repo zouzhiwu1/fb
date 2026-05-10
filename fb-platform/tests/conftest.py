@@ -50,5 +50,5 @@ def make_test_user_and_token(platform_app):
         db.session.add(u)
         db.session.commit()
         uid = u.id
-        tok = _create_token(uid)
+        tok = _create_token(uid, int(u.session_version or 1))
     return uid, tok

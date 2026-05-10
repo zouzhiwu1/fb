@@ -15,6 +15,7 @@ from typing import Protocol
 from app import db
 from app.membership import SOURCE_PURCHASE, add_membership
 from app.models import PaymentOrder
+from app.partner_points import record_recharge_points_ledger
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,9 @@ class DefaultMembershipFulfillment:
             order.status = "paid"
             if payment.provider_trade_id:
                 order.trade_no = payment.provider_trade_id
-            order.paid_at = datetime.now()
+            paid_at = datetime.now()
+            order.paid_at = paid_at
+            record_recharge_points_ledger(order, paid_at)
             db.session.commit()
             logger.info("fulfill paid out_trade_no=%s user=%s", out_no, order.user_id)
             return FulfillOutcome(FulfillResult.OK_FULFILLED)
