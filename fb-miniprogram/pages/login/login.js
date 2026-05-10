@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const promo = require('../../utils/promoAgent.js');
 const { API_BASE } = require('../../utils/config.js');
 
 Page({
@@ -6,6 +7,13 @@ Page({
     phone: '',
     password: '',
     loading: false,
+  },
+
+  onLoad(options) {
+    var aid = promo.parseAgentIdFromOptions(options || {});
+    if (aid) {
+      promo.persistPendingAgentId(aid);
+    }
   },
 
   onShow() {
@@ -47,6 +55,7 @@ Page({
           });
           return;
         }
+        promo.clearPendingAgentId();
         api.setSession(data.token, data.user);
         api.bindWechatMp();
         wx.reLaunch({ url: '/pages/home/home' });

@@ -1,4 +1,5 @@
 const { API_BASE } = require('./config.js');
+const promo = require('./promoAgent.js');
 
 const TOKEN_KEY = 'football_platform_token';
 const USER_KEY = 'football_platform_user';
@@ -107,14 +108,24 @@ function quickLoginWechatMp(phoneCode) {
           reject(new Error('微信登录失败，请重试'));
           return;
         }
+        var qBody = {
+          login_code: loginCode,
+          phone_code: phoneCode,
+        };
+        var pendingAid = promo.readPendingAgentId();
+        if (pendingAid) {
+          qBody.agent_id = pendingAid;
+        }
         request('/api/auth/wechat-mp/quick-login', {
           method: 'POST',
-          data: {
-            login_code: loginCode,
-            phone_code: phoneCode,
-          },
+          data: qBody,
         })
-          .then(resolve)
+          .then(function (res) {
+            if (res.ok && res.data && res.data.ok) {
+              promo.clearPendingAgentId();
+            }
+            resolve(res);
+          })
           .catch(reject);
       },
       fail: () => reject(new Error('微信登录失败，请重试')),

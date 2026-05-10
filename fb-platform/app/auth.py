@@ -290,7 +290,7 @@ def wechat_mp_quick_login():
     1) wx.login 的 code 换 openid
     2) getPhoneNumber 的 code 换手机号
     3) 依据 openid/phone 自动注册或登录并返回平台 token
-    Body: { "login_code": "...", "phone_code": "..." }
+    Body: { "login_code": "...", "phone_code": "...", "agent_id" 可选（仅新建账号时写入推广归因） }
     """
     data = request.get_json() or {}
     login_code = (data.get("login_code") or "").strip()
@@ -346,6 +346,10 @@ def wechat_mp_quick_login():
             if user:
                 user.wechat_mp_openid = openid
             else:
+                reg_agent_id, agent_err = _registration_agent_id_or_error(data)
+                if agent_err is not None:
+                    body, status = agent_err
+                    return body, status
                 user = User(
                     username=_new_wechat_username(),
                     gender="其他",
@@ -353,6 +357,7 @@ def wechat_mp_quick_login():
                     email=None,
                     password_hash=None,
                     wechat_mp_openid=openid,
+                    agent_id=reg_agent_id,
                 )
                 db.session.add(user)
                 db.session.flush()

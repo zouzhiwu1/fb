@@ -1,24 +1,6 @@
 const api = require('../../utils/api.js');
+const promo = require('../../utils/promoAgent.js');
 const { PASSWORD_POLICY_HINT, validatePasswordClient } = require('../../utils/passwordPolicy.js');
-
-function parseAgentIdFromOptions(options) {
-  if (!options) return null;
-  if (options.scene) {
-    var scene = options.scene;
-    try {
-      scene = decodeURIComponent(scene);
-    } catch (e) {
-      /* 非编码串 */
-    }
-    var m = /agent_id=(\d+)/.exec(String(scene));
-    if (m) return parseInt(m[1], 10);
-  }
-  if (options.agent_id) {
-    var n = parseInt(String(options.agent_id), 10);
-    if (!isNaN(n) && n > 0) return n;
-  }
-  return null;
-}
 
 Page({
   data: {
@@ -33,9 +15,12 @@ Page({
   },
 
   onLoad(options) {
-    var aid = parseAgentIdFromOptions(options || {});
+    var aid =
+      promo.parseAgentIdFromOptions(options || {}) ||
+      promo.readPendingAgentId();
     if (aid) {
       this.setData({ agentId: aid });
+      promo.persistPendingAgentId(aid);
     }
   },
 
@@ -87,8 +72,9 @@ Page({
       phone: this.data.phone.trim(),
       email: this.data.email.trim(),
     };
-    if (this.data.agentId) {
-      payload.agent_id = this.data.agentId;
+    var aid = this.data.agentId || promo.readPendingAgentId();
+    if (aid) {
+      payload.agent_id = aid;
     }
     api
       .request('/api/auth/register', {
@@ -105,6 +91,7 @@ Page({
           return;
         }
         if (data.token && data.user) {
+          promo.clearPendingAgentId();
           api.setSession(data.token, data.user);
           api.bindWechatMp();
           wx.reLaunch({ url: '/pages/home/home' });
