@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-import base64
-import json
 import logging
 import re
-import time
 from datetime import datetime
 
-import requests
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
 
@@ -14,11 +10,11 @@ import config as _cfg
 from app import db
 from app.auth_partner import require_partner_token
 from app.models import Agent, AgentCommissionLine
+from app.promo_miniprogram_qr import load_agent_promo_miniprogram_qr_data_url
 
 partner_ui_bp = Blueprint("partner_api", __name__, url_prefix="/api/partner")
 
 _YM_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-_WX_TOKEN_CACHE: dict[str, object] = {"token": "", "expire_at": 0.0}
 
 
 def _parse_month_param(raw: str | None) -> str:
@@ -57,79 +53,6 @@ def _exec_mappings(sql: str, params: dict) -> list:
     except Exception:
         logging.exception("partner dashboard sql")
         return []
-
-
-def _get_wechat_access_token() -> str:
-    now = time.time()
-    token = str(_WX_TOKEN_CACHE.get("token") or "")
-    expire_at = float(_WX_TOKEN_CACHE.get("expire_at") or 0.0)
-    if token and now < expire_at:
-        return token
-    app_id = (_cfg.PARTNER_PROMO_MP_APP_ID or "").strip()
-    app_secret = (_cfg.PARTNER_PROMO_MP_APP_SECRET or "").strip()
-    if not app_id or not app_secret:
-        return ""
-    try:
-        r = requests.get(
-            "https://api.weixin.qq.com/cgi-bin/token",
-            params={
-                "grant_type": "client_credential",
-                "appid": app_id,
-                "secret": app_secret,
-            },
-            timeout=10,
-        )
-        data = r.json() if r.ok else {}
-    except Exception:
-        logging.exception("partner promo get wechat access_token failed")
-        return ""
-    tk = str((data or {}).get("access_token") or "").strip()
-    if not tk:
-        logging.warning("partner promo token err: %s", data)
-        return ""
-    ttl = int((data or {}).get("expires_in") or 7200)
-    _WX_TOKEN_CACHE["token"] = tk
-    _WX_TOKEN_CACHE["expire_at"] = now + max(300, ttl - 120)
-    return tk
-
-
-def _generate_partner_miniprogram_qr_image_data_url(agent_id: int) -> str:
-    """生成微信小程序码图片（data URL，scene=agent_id）。失败返回空字符串。"""
-    entry_page = (_cfg.PARTNER_PROMO_MP_ENTRY_PAGE or "").strip()
-    if not entry_page:
-        return ""
-    access_token = _get_wechat_access_token()
-    if not access_token:
-        return ""
-    try:
-        r = requests.post(
-            "https://api.weixin.qq.com/wxa/getwxacodeunlimit",
-            params={"access_token": access_token},
-            json={
-                "scene": f"agent_id={agent_id}",
-                "page": entry_page,
-                "check_path": False,
-                "env_version": (_cfg.PARTNER_PROMO_MP_CODE_ENV_VERSION or "trial"),
-                "width": int(_cfg.PARTNER_PROMO_MP_CODE_WIDTH or 430),
-            },
-            timeout=10,
-        )
-        body = r.content or b""
-    except Exception:
-        logging.exception("partner promo generate miniprogram code failed")
-        return ""
-    if not body:
-        return ""
-    ctype = (r.headers.get("Content-Type") or "").lower()
-    is_json = "application/json" in ctype or body[:1] == b"{"
-    if is_json:
-        try:
-            data = json.loads(body.decode("utf-8", errors="ignore"))
-        except Exception:
-            data = {"raw": body.decode("utf-8", errors="ignore")[:200]}
-        logging.warning("partner promo generate miniprogram code err: %s", data)
-        return ""
-    return "data:image/png;base64," + base64.b64encode(body).decode("ascii")
 
 
 @partner_ui_bp.route("/stats/summary", methods=["GET"])
@@ -191,7 +114,7 @@ def partner_promo_links():
     if err:
         return err
     bundle = _cfg.partner_promo_bundle(agent.id, agent.agent_code)
-    mp_qr_image = _generate_partner_miniprogram_qr_image_data_url(agent.id)
+    mp_qr_image = load_agent_promo_miniprogram_qr_data_url(agent.id)
     if mp_qr_image:
         for ch in bundle.get("channels") or []:
             if ch.get("id") == "miniprogram":

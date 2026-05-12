@@ -38,6 +38,12 @@ mysql -h … -u … -p fb < scripts/migrate_partner_admin_and_agent_profile.sql
 
 并按需为 `agents.phone` 增加唯一索引（脚本内有说明）。
 
+**管理端保存代理商时报「请执行 migrate_agent_payout_profile.sql」**（缺 `payout_channel` / `payout_account` / `payout_holder_name` 或 `login_name` 过短）：在业务库执行本目录下的 `scripts/migrate_agent_payout_profile.sql`（脚本可重复执行）：
+
+```bash
+mysql -h … -u … -p 你的库名 < scripts/migrate_agent_payout_profile.sql
+```
+
 ## 管理员：`partner_admins` 与部署根账号
 
 - **表 `partner_admins`**：仅存 **库内管理员** 的登录名与密码哈希、`session_version`、`status` 等；由根账号在 **`/admin/managers`** 或运维通过 **`bootstrap-admin`** 写入。
@@ -108,7 +114,7 @@ PARTNER_PROMO_MP_CODE_ENV_VERSION=trial
 
 若 `PARTNER_PROMO_MP_QR_TARGET` 指向 `https://你的域名/invite-mp?agent_id=…`，该路径由 **fb-platform** 提供（服务器需配置 `WECHAT_MP_APP_ID` 及可选 `INVITE_MP_ENTRY_PAGE` / `INVITE_MP_ENV_VERSION`），且域名 HTTPS 需反代到 platform 进程。
 
-配置后，`/api/partner/stats/promo-links` 会优先调用微信 `getwxacodeunlimit` 生成包含 `scene=agent_id` 的小程序码图片并直接展示；失败时回退到 `PARTNER_PROMO_MP_QR_TARGET`（若已配置）。
+配置 `PARTNER_PROMO_MP_APP_*` 后，管理员在 **注册代理商 / 提交开户**（以及 `bootstrap-agent`）成功时会调用微信 `getwxacodeunlimit` **一次**，将 PNG 保存到 monorepo 根目录下 **`fb-agent-qrcode/{agent_id}.png`**（可用环境变量 **`PARTNER_AGENT_QR_STORAGE_DIR`** 覆盖目录；若仅部署 `fb-partner` 子目录而无上级 `fb` 仓库结构，**必须**将该变量设为服务器上的绝对路径）。代理商打开「推广二维码」页与管理员「查看代理商」时**只读该文件**，不再每次请求微信，避免 access_token 争用导致不稳定。未生成文件时，推广页仍可对 H5 链接展示方块二维码。
 
 注意：小程序若尚未发布线上版本，微信接口会返回 `errcode=85079`（`miniprogram has no online release`），此时需先发布线上版本，或临时使用体验版二维码联调。
 

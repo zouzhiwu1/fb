@@ -30,6 +30,11 @@ from app.models import (
     PartnerAdmin,
     PayoutOrder,
 )
+from app.promo_miniprogram_qr import (
+    load_agent_promo_miniprogram_qr_data_url,
+    mp_promo_env_configured,
+    save_agent_promo_miniprogram_qr,
+)
 
 partner_admin_bp = Blueprint("partner_admin_api", __name__, url_prefix="/api/partner/admin")
 
@@ -500,6 +505,20 @@ def create_agent():
         )
         db.session.add(agent)
         db.session.commit()
+        if mp_promo_env_configured():
+            if not save_agent_promo_miniprogram_qr(agent.id):
+                db.session.delete(agent)
+                db.session.commit()
+                return jsonify(
+                    {
+                        "ok": False,
+                        "message": (
+                            "推广小程序码生成失败（微信接口或网络），本次未创建代理商。"
+                            "请稍后重试；若同小程序 AppID 在其它服务也在拉 access_token，"
+                            "可能导致冲突，需统一 token 或改用稳定版接口。"
+                        ),
+                    }
+                ), 503
         return jsonify({"ok": True, "agent": _agent_public_row(agent)})
     except IntegrityError:
         db.session.rollback()
@@ -805,7 +824,11 @@ def get_agent(agent_id: int):
         agent = db.session.get(Agent, agent_id)
         if not agent:
             return jsonify({"ok": False, "message": "代理商不存在"}), 404
-        return jsonify({"ok": True, "agent": _agent_public_row(agent)})
+        row = _agent_public_row(agent)
+        row["promo_miniprogram_qr_data_url"] = (
+            load_agent_promo_miniprogram_qr_data_url(agent.id) or None
+        )
+        return jsonify({"ok": True, "agent": row})
     except Exception:
         logging.exception("get_agent")
         return jsonify({"ok": False, "message": "读取失败"}), 500

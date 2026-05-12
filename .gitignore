@@ -1,6 +1,8 @@
 fb-data/
 fb-log/
 fb-report/
+fb-agent-qrcode/*
+!fb-agent-qrcode/.gitkeep
 
 __pycache__/
 *.py[cod]

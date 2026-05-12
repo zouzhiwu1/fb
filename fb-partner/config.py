@@ -82,6 +82,8 @@ PARTNER_PROMO_MP_CODE_ENV_VERSION = os.environ.get(
 PARTNER_PROMO_MP_CODE_WIDTH = int(
     os.environ.get("PARTNER_PROMO_MP_CODE_WIDTH", "430") or "430"
 )
+# 推广小程序码文件目录；不设则默认 monorepo 根目录下 fb-agent-qrcode/，文件名为 {agent_id}.png
+PARTNER_AGENT_QR_STORAGE_DIR = os.environ.get("PARTNER_AGENT_QR_STORAGE_DIR", "").strip()
 
 def _expand_promo_template(template: str, agent_id: int, agent_code: str) -> str:
     if not template or not template.strip():

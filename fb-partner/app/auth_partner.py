@@ -24,6 +24,7 @@ from app.contact_format import (
     validate_payout_holder_name,
 )
 from app.models import Agent, PartnerAdmin
+from app.promo_miniprogram_qr import mp_promo_env_configured, save_agent_promo_miniprogram_qr
 
 partner_auth_bp = Blueprint("partner_auth", __name__)
 
@@ -512,6 +513,19 @@ def bootstrap_agent():
     )
     db.session.add(agent)
     db.session.commit()
+    if mp_promo_env_configured():
+        if not save_agent_promo_miniprogram_qr(agent.id):
+            db.session.delete(agent)
+            db.session.commit()
+            return jsonify(
+                {
+                    "ok": False,
+                    "message": (
+                        "推广小程序码生成失败（微信接口或网络），本次未创建代理商。"
+                        "请稍后重试。"
+                    ),
+                }
+            ), 503
     return jsonify({"ok": True, "agent_id": agent.id})
 
 

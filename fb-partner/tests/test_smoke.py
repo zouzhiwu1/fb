@@ -204,7 +204,7 @@ def test_partner_promo_links(client, monkeypatch):
     monkeypatch.setenv("PARTNER_PROMO_MP_APP_ID", "wx-test")
     monkeypatch.setenv("PARTNER_PROMO_MP_APP_SECRET", "sec-test")
     monkeypatch.setattr(
-        "app.dashboard._generate_partner_miniprogram_qr_image_data_url",
+        "app.dashboard.load_agent_promo_miniprogram_qr_data_url",
         lambda agent_id: f"data:image/png;base64,MOCK{agent_id}",
     )
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}

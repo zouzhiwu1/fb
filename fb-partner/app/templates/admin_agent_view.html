@@ -43,6 +43,11 @@
     h += '<dt>本月分润率</dt><dd>' + esc(a.current_rate) + '</dd>';
     h += '<dt>状态</dt><dd>' + esc(a.status) + '</dd>';
     h += '<dt>创建时间</dt><dd>' + esc(a.created_at || '—') + '</dd>';
+    if (a.promo_miniprogram_qr_data_url) {
+      h += '<dt>推广小程序码</dt><dd><img alt="推广小程序码" src="' + esc(a.promo_miniprogram_qr_data_url) + '" style="max-width:220px;height:auto;border:1px solid #e5e5e5;border-radius:8px;padding:8px;background:#fff;" /></dd>';
+    } else {
+      h += '<dt>推广小程序码</dt><dd class="muted">暂无文件（未配置微信或开户时未生成）。路径：<code>fb-agent-qrcode/' + esc(String(a.id)) + '.png</code></dd>';
+    }
     h += '</dl>';
     document.getElementById('view_wrap').innerHTML = h;
   }
