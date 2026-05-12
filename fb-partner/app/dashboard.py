@@ -5,6 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 import config as _cfg
 from app import db
@@ -126,6 +127,22 @@ def partner_promo_links():
 
 def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
     """文档 1.2：按月汇总与明细；供代理商接口与管理员代查共用。"""
+    # 与管理员 commission-lines 一致：查表前把当月注册/充值增量写入 agent_commission_lines（幂等）。
+    # 否则代理商只看 monthly-board 时会出现「业绩有数、服务费明细为空」。
+    try:
+        from app.admin_api import _sync_agent_commission_lines
+
+        _sync_agent_commission_lines(agent, ym)
+        db.session.commit()
+    except OperationalError:
+        db.session.rollback()
+        logging.warning(
+            "partner commission_lines sync skipped (users/payment_orders 等表不可用或库未就绪)"
+        )
+    except Exception:
+        db.session.rollback()
+        logging.exception("partner commission_lines sync before monthly board")
+
     start, end = _month_start_end(ym)
     aid = agent.id
     bind = {"aid": aid, "start": start, "end": end, "ym": ym}

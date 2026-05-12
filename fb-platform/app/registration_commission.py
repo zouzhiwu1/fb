@@ -65,10 +65,16 @@ def try_insert_registration_commission_line(
         )
         db.session.add(row)
         db.session.commit()
+        logger.info(
+            "registration commission line inserted agent_id=%s user_id=%s amount=%s",
+            agent_id,
+            user_id,
+            amt,
+        )
     except IntegrityError:
         db.session.rollback()
-        logger.debug(
-            "registration commission line already exists agent_id=%s user_id=%s",
+        logger.info(
+            "registration commission line already exists (skip) agent_id=%s user_id=%s",
             agent_id,
             user_id,
         )

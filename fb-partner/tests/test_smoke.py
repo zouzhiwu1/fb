@@ -318,7 +318,7 @@ def test_admin_agent_monthly_board_api(client, app):
     r4 = client.get("/admin/agents/%s/commission" % aid)
     assert r4.status_code == 200
     t4 = r4.get_data(as_text=True)
-    assert "服务费" in t4 and "结算服务费" in t4
+    assert "佣金明细" in t4 and "结算佣金" in t4
 
     r5 = client.get("/admin/agents/%s/dashboard" % aid, follow_redirects=False)
     assert r5.status_code == 302
