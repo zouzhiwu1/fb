@@ -104,15 +104,16 @@
 
   function renderKpi(s) {
     var pct = (s.rebate_rate != null ? (Number(s.rebate_rate) * 100).toFixed(2) : '—');
+    var rf = (s.reg_factor != null ? Number(s.reg_factor) : null);
     var cells = [
-      { k: '总业绩（元）', v: s.performance_total_yuan != null ? s.performance_total_yuan : '—' },
-      { k: '积分（核算）', v: s.points != null ? s.points : '—' },
-      { k: '服务费（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
-      { k: '已结算金额', v: s.settled_commission_yuan != null ? (s.settled_commission_yuan + ' 元') : '—', muted: true },
-      { k: '本月流水积分', v: s.points_ledger_month != null ? s.points_ledger_month : '—' },
-      { k: '分润率', v: pct + '%' },
-      { k: '拉新业绩（元）', v: s.performance_reg_yuan },
-      { k: '充值业绩（元）', v: s.performance_recharge_yuan }
+      { k: '拉新人数', v: s.valid_reg_count != null ? s.valid_reg_count : '—' },
+      { k: '拉新系数', v: rf != null ? rf : '—' },
+      { k: '拉新服务费（元）', v: s.service_fee_reg_yuan != null ? s.service_fee_reg_yuan : '—' },
+      { k: '充值总金额（元）', v: s.recharge_total_yuan != null ? s.recharge_total_yuan : '—' },
+      { k: '充值分润率', v: pct + '%' },
+      { k: '充值服务费（元）', v: s.service_fee_recharge_yuan != null ? s.service_fee_recharge_yuan : '—' },
+      { k: '服务费合计（元）', v: s.commission_yuan != null ? s.commission_yuan : '—' },
+      { k: '已结算金额', v: s.settled_commission_yuan != null ? (s.settled_commission_yuan + ' 元') : '—', muted: true }
     ];
     document.getElementById('kpi').innerHTML = cells.map(function (c) {
       return '<div class="kpi' + (c.muted ? ' muted' : '') + '"><div class="k">' + esc(c.k) + '</div><div class="v">' + esc(c.v) + '</div></div>';

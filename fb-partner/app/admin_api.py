@@ -117,9 +117,6 @@ def _sync_agent_commission_lines(agent: Agent, ym: str) -> None:
     aid = agent.id
     reg_factor = Decimal(str(_cfg.PARTNER_REG_FACTOR)).quantize(Decimal("0.0001"))
     rebate_rate = Decimal(str(agent.current_rate or 0)).quantize(Decimal("0.0001"))
-    commission_per_point = Decimal(str(_cfg.PARTNER_COMMISSION_PER_POINT)).quantize(
-        Decimal("0.0001")
-    )
 
     # 拉新事件：按 (agent_id, user_id, commission_type=registration) 幂等
     reg_rows = db.session.execute(
@@ -181,9 +178,7 @@ def _sync_agent_commission_lines(agent: Agent, ym: str) -> None:
         recharge_amount = Decimal(str(r.get("total_amount") or 0)).quantize(
             Decimal("0.01")
         )
-        commission_amount = (recharge_amount * rebate_rate * commission_per_point).quantize(
-            Decimal("0.01")
-        )
+        commission_amount = (recharge_amount * rebate_rate).quantize(Decimal("0.01"))
         c = AgentCommissionLine(
             agent_id=aid,
             user_id=int(r["user_id"]),

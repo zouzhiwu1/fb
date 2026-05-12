@@ -46,19 +46,18 @@ PARTNER_ROOT_SESSION_VERSION = int(
     os.environ.get("PARTNER_ROOT_SESSION_VERSION", "1") or "1"
 )
 
-# 每名有效拉新折算的业绩（元），与文档 2.1 中 R_reg 一致；platform 入账积分流水时可另记 event_type。
+# 历史/兼容：月度服务费看板已不再使用下列两项（保留环境变量以免旧部署报错）
 PARTNER_YUAN_PER_VALID_REGISTRATION = float(
     os.environ.get("PARTNER_YUAN_PER_VALID_REGISTRATION", "1")
 )
-# 服务费：积分 × 系数（文档默认 1 积分 = 1 元）
 PARTNER_COMMISSION_PER_POINT = float(
     os.environ.get("PARTNER_COMMISSION_PER_POINT", "1")
 )
-# 拉新服务费系数（用于 registration 明细行快照与金额计算）
+# 拉新服务费：每名拉新对应明细金额快照（与 platform 注册入账一致）
 PARTNER_REG_FACTOR = float(
     os.environ.get("PARTNER_REG_FACTOR", "1")
 )
-# 视为「注册奖励」类积分流水的 event_type（可逗号分隔）
+# 视为「注册奖励」类积分流水的 event_type（可逗号分隔）；看板月度接口不再读取，平台写积分流水时仍可用
 PARTNER_LEDGER_EVENT_TYPES_REG = tuple(
     x.strip()
     for x in os.environ.get(

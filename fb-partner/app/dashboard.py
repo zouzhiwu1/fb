@@ -171,47 +171,17 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
     reg_rows = _exec_mappings(reg_sql, bind)
     reg_count = len(reg_rows)
 
-    types_reg = _cfg.PARTNER_LEDGER_EVENT_TYPES_REG
-    reg_points_by_user: dict[int, float] = {}
-    if types_reg:
-        tkeys = [f"t{i}" for i in range(len(types_reg))]
-        placeholders = ", ".join(f":{k}" for k in tkeys)
-        tparams = {tkeys[i]: types_reg[i] for i in range(len(types_reg))}
-        ledger_reg_sql = f"""
-        SELECT user_id, COALESCE(SUM(points_delta), 0) AS pts
-        FROM points_ledger
-        WHERE agent_id = :aid
-        AND created_at >= :start AND created_at < :end
-        AND user_id IS NOT NULL
-        AND event_type IN ({placeholders})
-        GROUP BY user_id
-        """
-        for row in _exec_mappings(ledger_reg_sql, {**bind, **tparams}):
-            uid = row.get("user_id")
-            if uid is not None:
-                reg_points_by_user[int(uid)] = float(row["pts"] or 0)
-
     referrals = []
     for r in reg_rows:
-        uid = int(r["user_id"])
-        pts = reg_points_by_user.get(uid, 0.0)
         created = r["created_at"]
         if hasattr(created, "isoformat"):
             created_iso = created.isoformat(sep=" ", timespec="seconds")
         else:
             created_iso = str(created)
-        if pts > 0:
-            reward_label = f"+{pts:.1f} 积分"
-            status_label = "正常"
-        else:
-            reward_label = "0.0"
-            status_label = "正常（奖励未入账）"
         referrals.append(
             {
                 "user_mask": mask_phone(r.get("phone")),
                 "registered_at": created_iso,
-                "register_reward": reward_label,
-                "status": status_label,
             }
         )
 
@@ -248,31 +218,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
             }
         )
 
-    yuan_per_reg = float(_cfg.PARTNER_YUAN_PER_VALID_REGISTRATION)
-    performance_reg = float(reg_count) * yuan_per_reg
-    performance_recharge = round(recharge_sum, 2)
-    performance_total = round(performance_reg + performance_recharge, 2)
     rebate_rate = float(agent.current_rate or 0)
-    points_computed = round(performance_total * rebate_rate, 4)
-
-    ledger_month_sql = """
-    SELECT COALESCE(SUM(points_delta), 0) AS s
-    FROM points_ledger
-    WHERE agent_id = :aid
-    AND (
-        settlement_month = :ym
-        OR (settlement_month IS NULL AND created_at >= :start AND created_at < :end)
-    )
-    """
-    ledger_month = 0.0
-    lm_rows = _exec_mappings(ledger_month_sql, bind)
-    if lm_rows:
-        ledger_month = float(lm_rows[0].get("s") or 0)
-
-    commission = round(
-        points_computed * float(_cfg.PARTNER_COMMISSION_PER_POINT), 4
-    )
-
     settled_total = round(float(agent.settled_commission_yuan or 0), 2)
 
     try:
@@ -289,7 +235,14 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
         logging.exception("partner dashboard commission_lines query")
         commission_rows = []
     commission_lines = []
+    sum_reg_lines = 0.0
+    sum_rec_lines = 0.0
     for row in commission_rows:
+        line_amt = round(float(row.commission_amount or 0), 2)
+        if row.commission_type == "registration":
+            sum_reg_lines += line_amt
+        else:
+            sum_rec_lines += line_amt
         created_at = row.created_at
         created_at_str = (
             created_at.isoformat(sep=" ", timespec="seconds")
@@ -314,7 +267,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
                 "id": int(row.id),
                 "username": row.username or "—",
                 "commission_type": ctype,
-                "commission_amount": round(float(row.commission_amount or 0), 2),
+                "commission_amount": line_amt,
                 "remark": remark,
                 "created_at": created_at_str,
                 "payment_status": _payment_status_zh(row.payment_status),
@@ -322,20 +275,19 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
             }
         )
 
+    commission_yuan = round(sum_reg_lines + sum_rec_lines, 2)
+
     return {
         "ok": True,
         "month": ym,
         "summary": {
-            "performance_total_yuan": performance_total,
-            "performance_reg_yuan": round(performance_reg, 2),
-            "performance_recharge_yuan": performance_recharge,
+            "service_fee_reg_yuan": round(sum_reg_lines, 2),
+            "service_fee_recharge_yuan": round(sum_rec_lines, 2),
+            "commission_yuan": commission_yuan,
             "valid_reg_count": reg_count,
-            "yuan_per_registration": yuan_per_reg,
+            "recharge_total_yuan": round(recharge_sum, 2),
+            "reg_factor": float(_cfg.PARTNER_REG_FACTOR),
             "rebate_rate": rebate_rate,
-            "points": points_computed,
-            "points_ledger_month": ledger_month,
-            "commission_yuan": commission,
-            "commission_per_point": float(_cfg.PARTNER_COMMISSION_PER_POINT),
             "settled_commission_yuan": settled_total,
         },
         "referrals": referrals,
@@ -343,15 +295,14 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
         "recharges_total_yuan": round(recharge_sum, 2),
         "commission_lines": commission_lines,
         "notes": {
-            "formula": "总业绩=拉新业绩+充值业绩；积分=总业绩×本月分润率；服务费=积分×积分系数。",
-            "ledger": "points_ledger_month 为当月流水汇总（settlement_month 或创建时间落在本月）。",
+            "formula": "服务费=拉新服务费+充值服务费；展示金额与当月服务费明细各行之和一致；入账时拉新系数、充值分润率均为快照。",
         },
     }
 
 
 @partner_ui_bp.route("/stats/monthly-board", methods=["GET"])
 def partner_monthly_board():
-    """文档 1.2：按月汇总业绩/积分/服务费 + 拉新明细 + 充值明细（依赖 users / payment_orders / points_ledger）。"""
+    """按月汇总服务费（与 agent_commission_lines 明细一致）+ 拉新/充值列表（依赖 users / payment_orders）。"""
     agent, err = require_partner_token()
     if err:
         return err
