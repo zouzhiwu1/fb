@@ -34,6 +34,10 @@ def get_sqlalchemy_engine_options():
     """若使用 PyMySQL 且密码可能含非 ASCII，用自定义 creator 避免 UnicodeEncodeError。"""
     return _get_sqlalchemy_engine_options(DATABASE_URL)
 
+
+# 与 fb-partner PARTNER_REG_FACTOR 一致：拉新写入 agent_commission_lines 的 registration 金额快照
+PARTNER_REG_FACTOR = float(os.environ.get("PARTNER_REG_FACTOR", "1") or "1")
+
 # JWT（RFC 7518 建议 HS256 密钥至少 32 字节，否则会触发 InsecureKeyLengthWarning）
 JWT_SECRET_KEY = os.environ.get(
     "JWT_SECRET_KEY",

@@ -49,6 +49,15 @@ def test_register_saves_agent_id(platform_app, platform_client, _agent_for_regis
     with platform_app.app_context():
         u = User.query.filter_by(phone=phone).one()
         assert u.agent_id == aid
+        from app.models import AgentCommissionLine
+
+        line = AgentCommissionLine.query.filter_by(
+            agent_id=aid,
+            user_id=u.id,
+            commission_type="registration",
+        ).one()
+        assert float(line.commission_amount) == 1.0
+        assert line.payment_status == "pending"
 
 
 def test_register_rejects_inactive_or_missing_agent(platform_app, platform_client):
@@ -104,3 +113,11 @@ def test_wechat_mp_quick_login_sets_agent_for_new_user(
     with platform_app.app_context():
         u = User.query.filter_by(phone=phone).one()
         assert u.agent_id == aid
+        from app.models import AgentCommissionLine
+
+        line = AgentCommissionLine.query.filter_by(
+            agent_id=aid,
+            user_id=u.id,
+            commission_type="registration",
+        ).one()
+        assert float(line.commission_amount) == 1.0

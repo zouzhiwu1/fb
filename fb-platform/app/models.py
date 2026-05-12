@@ -152,6 +152,40 @@ class Agent(db.Model):
     )
 
 
+class AgentCommissionLine(db.Model):
+    """服务费明细（与 fb-partner 共用表 agent_commission_lines）；不在此声明 partner_admins 外键以便测试 db.create_all。"""
+
+    __tablename__ = "agent_commission_lines"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    agent_id = db.Column(
+        db.Integer,
+        db.ForeignKey("agents.id"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    username = db.Column(db.String(128), nullable=False, default="")
+    commission_type = db.Column(db.String(16), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)
+    reg_factor = db.Column(db.Numeric(14, 4), nullable=True)
+    payment_order_id = db.Column(db.String(64), nullable=True, index=True)
+    recharge_amount = db.Column(db.Numeric(14, 2), nullable=True)
+    rebate_rate = db.Column(db.Numeric(6, 4), nullable=True)
+    commission_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    payment_status = db.Column(db.String(16), nullable=False, default="pending", index=True)
+    paid_at = db.Column(db.DateTime, nullable=True, index=True)
+    paid_by_admin_id = db.Column(db.Integer, nullable=True, index=True)
+    payout_reference = db.Column(db.String(256), nullable=True)
+    payment_batch_id = db.Column(db.String(64), nullable=True, index=True)
+    payout_order_id = db.Column(db.Integer, nullable=True, index=True)
+
+
 class PointsLedger(db.Model):
     """代理商积分流水（与 fb-partner 共用表 points_ledger）。"""
 

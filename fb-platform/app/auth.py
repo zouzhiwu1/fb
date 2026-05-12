@@ -13,6 +13,7 @@ from app import db
 from app.models import Agent, User, VerificationCode
 from app.sms import generate_code, send_sms
 from app.membership import grant_free_week
+from app.registration_commission import try_insert_registration_commission_line
 from config import (
     JWT_SECRET_KEY,
     JWT_ALGORITHM,
@@ -211,6 +212,14 @@ def register():
         db.session.add(user)
         db.session.commit()
 
+        if reg_agent_id is not None:
+            try_insert_registration_commission_line(
+                reg_agent_id,
+                user.id,
+                user.phone,
+                user.created_at,
+            )
+
         # 新用户赠送周会员（设计书：仅限一次，账号维度）
         try:
             grant_free_week(user.id)
@@ -331,6 +340,7 @@ def wechat_mp_quick_login():
         return jsonify({"ok": False, "message": "微信未返回有效手机号"}), 400
 
     try:
+        reg_insert_agent_id = None
         user = User.query.filter_by(wechat_mp_openid=openid).first()
         if user:
             if user.phone != phone:
@@ -361,6 +371,8 @@ def wechat_mp_quick_login():
                 )
                 db.session.add(user)
                 db.session.flush()
+                if reg_agent_id is not None:
+                    reg_insert_agent_id = reg_agent_id
                 try:
                     grant_free_week(user.id)
                 except Exception as e:
@@ -373,6 +385,14 @@ def wechat_mp_quick_login():
         if hasattr(request, "app") and request.app.logger:
             request.app.logger.exception("微信快捷登录失败: %s", e)
         return jsonify({"ok": False, "message": "服务器错误，请稍后重试"}), 500
+
+    if reg_insert_agent_id is not None:
+        try_insert_registration_commission_line(
+            reg_insert_agent_id,
+            user.id,
+            user.phone,
+            user.created_at,
+        )
 
     token = _create_token(user.id, int(user.session_version))
     return jsonify({

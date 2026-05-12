@@ -48,7 +48,7 @@ PARTNER_ROOT_SESSION_VERSION = int(
 
 # 每名有效拉新折算的业绩（元），与文档 2.1 中 R_reg 一致；platform 入账积分流水时可另记 event_type。
 PARTNER_YUAN_PER_VALID_REGISTRATION = float(
-    os.environ.get("PARTNER_YUAN_PER_VALID_REGISTRATION", "100")
+    os.environ.get("PARTNER_YUAN_PER_VALID_REGISTRATION", "1")
 )
 # 服务费：积分 × 系数（文档默认 1 积分 = 1 元）
 PARTNER_COMMISSION_PER_POINT = float(
