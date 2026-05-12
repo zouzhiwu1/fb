@@ -9,6 +9,7 @@
   .code-hint.ok { color: #15803d; }
   .code-hint.bad { color: #b91c1c; }
   .code-hint.wait { color: #64748b; }
+  .msg.success { display: block !important; background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
 </style>
 {% endblock %}
 {% block admin_body %}
@@ -30,6 +31,13 @@
   function showErr(t) {
     var m = document.getElementById('msg');
     m.textContent = t;
+    m.className = 'msg error';
+    m.style.display = 'block';
+  }
+  function showSuccess(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.className = 'msg success';
     m.style.display = 'block';
   }
   function hideErr() {
@@ -217,6 +225,17 @@
             return;
           }
           if (!x.ok || !x.j.ok) { showErr(x.j.message || '保存失败'); return; }
+          if (x.j.promo_miniprogram_qr_regenerated === false && x.j.promo_miniprogram_qr_message) {
+            showErr(x.j.promo_miniprogram_qr_message);
+            return;
+          }
+          if (x.j.promo_miniprogram_qr_regenerated === true) {
+            showSuccess('资料已保存；推广小程序码已重新生成。');
+            setTimeout(function () {
+              window.location.href = partnerPath('/admin/agents/' + agentId);
+            }, 1200);
+            return;
+          }
           window.location.href = partnerPath('/admin/agents/' + agentId);
         })
         .catch(function () {

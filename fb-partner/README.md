@@ -114,7 +114,7 @@ PARTNER_PROMO_MP_CODE_ENV_VERSION=trial
 
 若 `PARTNER_PROMO_MP_QR_TARGET` 指向 `https://你的域名/invite-mp?agent_id=…`，该路径由 **fb-platform** 提供（服务器需配置 `WECHAT_MP_APP_ID` 及可选 `INVITE_MP_ENTRY_PAGE` / `INVITE_MP_ENV_VERSION`），且域名 HTTPS 需反代到 platform 进程。
 
-配置 `PARTNER_PROMO_MP_APP_*` 后，管理员在 **注册代理商 / 提交开户**（以及 `bootstrap-agent`）成功时会调用微信 `getwxacodeunlimit` **一次**，将 PNG 保存到 monorepo 根目录下 **`fb-agent-qrcode/{agent_id}.png`**（可用环境变量 **`PARTNER_AGENT_QR_STORAGE_DIR`** 覆盖目录；若仅部署 `fb-partner` 子目录而无上级 `fb` 仓库结构，**必须**将该变量设为服务器上的绝对路径）。代理商打开「推广二维码」页与管理员「查看代理商」时**只读该文件**，不再每次请求微信，避免 access_token 争用导致不稳定。未生成文件时，推广页仍可对 H5 链接展示方块二维码。
+配置 `PARTNER_PROMO_MP_APP_*` 后，管理员在 **注册代理商 / 提交开户**（以及 `bootstrap-agent`）成功时会调用微信 `getwxacodeunlimit` **一次**，将 PNG 保存到 monorepo 根目录下 **`fb-agent-qrcode/{agent_id}.png`**（可用环境变量 **`PARTNER_AGENT_QR_STORAGE_DIR`** 覆盖目录；若仅部署 `fb-partner` 子目录而无上级 `fb` 仓库结构，**必须**将该变量设为服务器上的绝对路径）。**在「修改代理商」页保存修改时**会再次调用微信并覆盖同路径文件，以便更新体验版/正式版等后刷新推广码。代理商打开「推广二维码」页与管理员「查看代理商」时**只读该文件**，不再每次请求微信，避免 access_token 争用导致不稳定。未生成文件时，推广页仍可对 H5 链接展示方块二维码。
 
 注意：小程序若尚未发布线上版本，微信接口会返回 `errcode=85079`（`miniprogram has no online release`），此时需先发布线上版本，或临时使用体验版二维码联调。
 

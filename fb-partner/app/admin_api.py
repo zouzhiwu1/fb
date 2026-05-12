@@ -961,7 +961,23 @@ def update_agent(agent_id: int):
             agent.session_version = int(agent.session_version or 1) + 1
 
         db.session.commit()
-        return jsonify({"ok": True, "agent": _agent_public_row(agent)})
+        promo_regenerated: bool | None = None
+        promo_qr_message: str | None = None
+        if mp_promo_env_configured():
+            if save_agent_promo_miniprogram_qr(agent.id):
+                promo_regenerated = True
+            else:
+                promo_regenerated = False
+                promo_qr_message = (
+                    "资料已保存，但推广小程序码重新生成失败，请检查微信接口或稍后再次保存。"
+                )
+        row = _agent_public_row(agent)
+        body: dict = {"ok": True, "agent": row}
+        if promo_regenerated is not None:
+            body["promo_miniprogram_qr_regenerated"] = promo_regenerated
+        if promo_qr_message:
+            body["promo_miniprogram_qr_message"] = promo_qr_message
+        return jsonify(body)
     except IntegrityError:
         db.session.rollback()
         return jsonify(
