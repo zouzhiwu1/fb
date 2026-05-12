@@ -37,6 +37,20 @@ def _month_start_end(ym: str) -> tuple[datetime, datetime]:
     return start, end
 
 
+def _payment_status_zh(raw: object | None) -> str:
+    """与管理员佣金页一致：月度看板 API 返回中文支付状态。"""
+    if raw is None:
+        return "待支付"
+    s = str(raw).strip().lower()
+    if not s:
+        return "待支付"
+    if s == "paid":
+        return "已支付"
+    if s == "pending":
+        return "待支付"
+    return str(raw).strip()
+
+
 def mask_phone(phone: object | None) -> str:
     if phone is None:
         return "—"
@@ -303,7 +317,7 @@ def build_monthly_board_dict(agent: Agent, ym: str) -> dict:
                 "commission_amount": round(float(row.commission_amount or 0), 2),
                 "remark": remark,
                 "created_at": created_at_str,
-                "payment_status": row.payment_status or "pending",
+                "payment_status": _payment_status_zh(row.payment_status),
                 "paid_at": paid_at_str,
             }
         )
