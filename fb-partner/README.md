@@ -5,7 +5,7 @@
 ## 角色
 
 - **部署根账号**：登录名固定为 **`root`**（不区分大小写），密码仅在 **`.env`** 的 **`PARTNER_ROOT_PASSWORD`**，**不入库**。与库内管理员共用 **`/admin/login`**，登录后进入 **`/admin/managers`**（管理员一览），可 **添加 / 修改 / 删除** 库内管理员（含改密、禁用）；**不能**操作代理商数据。**其它登录名**一律走表 **`partner_admins`**。
-- **库内管理员（admin）**：账号在表 **`partner_admins`**。登录后进入 **`/admin/agents`**，维护代理商。JWT 均为 `sub_type=partner_admin`，通过载荷中的 `admin_role`（`root` / `admin`）区分。
+- **库内管理员（admin）**：账号在表 **`partner_admins`**。登录后进入 **`/admin/agents`** 维护代理商；**`/admin/users`** 可按用户名/手机/邮箱查询并维护与 **fb-platform 共用库** 的 **`users`** 表（C 端用户资料）。JWT 均为 `sub_type=partner_admin`，通过载荷中的 `admin_role`（`root` / `admin`）区分。
 - **代理商**：使用「代理商登录」进入 `/dashboard`。JWT 声明 `sub_type=partner`（与管理员令牌互不通用）。
 
 库内管理员登录名 **禁止为 `root`**（含 API 与 bootstrap），以免与部署根账号混淆。
@@ -73,7 +73,7 @@ PARTNER_ROOT_PASSWORD=你的强密码
 # PARTNER_ROOT_SESSION_VERSION=1
 ```
 
-重启进程后，用 **登录名 `root`** + 上述密码打开 **`/admin/login`**，进入 **`/admin/managers`** 添加库内管理员；再用库内管理员登录，进入 **`/admin/agents`** 维护代理商。
+重启进程后，用 **登录名 `root`** + 上述密码打开 **`/admin/login`**，进入 **`/admin/managers`** 添加库内管理员；**`root` 也可打开 `/admin/users`** 查询/维护 C 端用户。库内管理员登录后进入 **`/admin/agents`** 维护代理商。
 
 ## 首个库内管理员（bootstrap，备选）
 

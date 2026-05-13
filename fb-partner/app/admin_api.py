@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash
 from fb_common import validate_password_strength
 
 from app import db
-from app.auth_partner import require_db_admin_token, require_root_only
+from app.auth_partner import require_admin_auth, require_db_admin_token, require_root_only
 from app.contact_format import (
     normalize_email,
     validate_agent_login_email,
@@ -989,3 +989,319 @@ def update_agent(agent_id: int):
         db.session.rollback()
         logging.exception("update_agent")
         return jsonify({"ok": False, "message": _MIGRATE_MSG}), 500
+
+
+# ---------------------------------------------------------------------------
+# Platform C 端用户（users 表，与 fb-platform 共用 MySQL）
+# ---------------------------------------------------------------------------
+
+_PLATFORM_USER_COLS_BASE = (
+    "id, username, gender, phone, email, session_version, "
+    "created_at, updated_at, free_week_granted_at, agent_id, "
+    "(password_hash IS NOT NULL AND TRIM(COALESCE(password_hash,'')) <> '') AS password_set"
+)
+_PLATFORM_USER_COLS_FULL = _PLATFORM_USER_COLS_BASE + ", wechat_mp_openid"
+
+_platform_user_select_cols: str | None = None
+
+
+def _platform_user_select_columns_sql() -> str:
+    global _platform_user_select_cols
+    if _platform_user_select_cols is not None:
+        return _platform_user_select_cols
+    try:
+        db.session.execute(
+            text(f"SELECT {_PLATFORM_USER_COLS_FULL} FROM users WHERE 1=0")
+        )
+        db.session.rollback()
+        _platform_user_select_cols = _PLATFORM_USER_COLS_FULL
+    except OperationalError:
+        db.session.rollback()
+        _platform_user_select_cols = _PLATFORM_USER_COLS_BASE
+    return _platform_user_select_cols
+
+
+def _platform_user_row_to_public(row) -> dict:
+    m = dict(row)
+    oid_raw = (m.get("wechat_mp_openid") or "").strip()
+    ps = m.get("password_set")
+    if isinstance(ps, (int, float)):
+        password_set = bool(int(ps))
+    else:
+        password_set = bool(ps)
+
+    def _dt(v):
+        if v is None:
+            return None
+        if hasattr(v, "isoformat"):
+            return v.isoformat(sep=" ", timespec="seconds")
+        return str(v)
+
+    if len(oid_raw) > 10:
+        oid_hint = f"{oid_raw[:4]}…{oid_raw[-4:]}"
+    elif oid_raw:
+        oid_hint = "已绑定"
+    else:
+        oid_hint = None
+
+    aid = m.get("agent_id")
+    if aid is not None:
+        try:
+            aid_out = int(aid)
+        except (TypeError, ValueError):
+            aid_out = None
+    else:
+        aid_out = None
+
+    return {
+        "id": int(m["id"]),
+        "username": m.get("username"),
+        "gender": m.get("gender"),
+        "phone": m.get("phone"),
+        "email": m.get("email"),
+        "session_version": int(m.get("session_version") or 1),
+        "created_at": _dt(m.get("created_at")),
+        "updated_at": _dt(m.get("updated_at")),
+        "free_week_granted_at": _dt(m.get("free_week_granted_at")),
+        "agent_id": aid_out,
+        "password_set": password_set,
+        "wechat_mp_openid_hint": oid_hint,
+    }
+
+
+def _platform_users_search(q: str) -> list:
+    q = (q or "").strip()
+    if not q:
+        return []
+    cols = _platform_user_select_columns_sql()
+    rows: list = []
+
+    def _run(sql: str, params: dict) -> list:
+        return list(db.session.execute(text(sql), params).mappings().all())
+
+    ok_phone, _ = validate_cn_mobile(q)
+    if ok_phone:
+        sql = f"SELECT {cols} FROM users WHERE phone = :q LIMIT 20"
+        rows = _run(sql, {"q": q})
+    elif "@" in q:
+        em = normalize_email(q)
+        sql = f"SELECT {cols} FROM users WHERE LOWER(TRIM(COALESCE(email,''))) = :em LIMIT 20"
+        rows = _run(sql, {"em": em})
+    else:
+        sql = (
+            f"SELECT {cols} FROM users WHERE username = :q OR phone = :q "
+            "OR LOWER(TRIM(COALESCE(email,''))) = :em LIMIT 20"
+        )
+        rows = _run(sql, {"q": q, "em": normalize_email(q)})
+    if rows:
+        return rows
+    pat = f"%{q}%"
+    sql = (
+        f"SELECT {cols} FROM users WHERE username LIKE :pat OR "
+        "LOWER(TRIM(COALESCE(email,''))) LIKE LOWER(:pat) LIMIT 20"
+    )
+    return _run(sql, {"pat": pat})
+
+
+_VALID_USER_GENDERS = frozenset({"男", "女", "其他"})
+
+
+@partner_admin_bp.route("/platform-users/search", methods=["GET"])
+def admin_platform_users_search():
+    _, err = require_admin_auth()
+    if err:
+        return err
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"ok": False, "message": "请填写查询关键词 q（用户名、手机号或邮箱）"}), 400
+    try:
+        raw_rows = _platform_users_search(q)
+        users = [_platform_user_row_to_public(r) for r in raw_rows]
+        return jsonify({"ok": True, "users": users, "count": len(users)})
+    except OperationalError:
+        logging.exception("admin_platform_users_search")
+        return jsonify(
+            {
+                "ok": False,
+                "message": "无法查询 users 表，请确认与 platform 共用库且已执行 init_database.sql。",
+            }
+        ), 500
+
+
+@partner_admin_bp.route("/platform-users/<int:user_id>", methods=["GET"])
+def admin_platform_user_get(user_id: int):
+    _, err = require_admin_auth()
+    if err:
+        return err
+    cols = _platform_user_select_columns_sql()
+    try:
+        row = db.session.execute(
+            text(f"SELECT {cols} FROM users WHERE id = :id"),
+            {"id": user_id},
+        ).mappings().first()
+    except OperationalError:
+        logging.exception("admin_platform_user_get")
+        return jsonify({"ok": False, "message": "无法读取 users 表"}), 500
+    if not row:
+        return jsonify({"ok": False, "message": "用户不存在"}), 404
+    return jsonify({"ok": True, "user": _platform_user_row_to_public(row)})
+
+
+@partner_admin_bp.route("/platform-users/<int:user_id>", methods=["PUT", "PATCH"])
+def admin_platform_user_update(user_id: int):
+    _, err = require_admin_auth()
+    if err:
+        return err
+    data = request.get_json() or {}
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "message": "请求体须为 JSON 对象"}), 400
+
+    cols = _platform_user_select_columns_sql()
+    try:
+        row = db.session.execute(
+            text(f"SELECT {cols} FROM users WHERE id = :id"),
+            {"id": user_id},
+        ).mappings().first()
+    except OperationalError:
+        return jsonify({"ok": False, "message": "无法读取 users 表"}), 500
+    if not row:
+        return jsonify({"ok": False, "message": "用户不存在"}), 404
+
+    current = dict(row)
+    uid = int(current["id"])
+
+    if "username" in data:
+        raw = (data.get("username") or "").strip()
+        username = raw or None
+        if username:
+            dup = db.session.execute(
+                text("SELECT id FROM users WHERE username = :u AND id <> :id LIMIT 1"),
+                {"u": username, "id": uid},
+            ).scalar()
+            if dup:
+                return jsonify({"ok": False, "message": "该用户名已被其他账号使用"}), 409
+
+    if "phone" in data:
+        phone = (data.get("phone") or "").strip()
+        ok, msg = validate_cn_mobile(phone)
+        if not ok:
+            return jsonify({"ok": False, "message": msg}), 400
+        dup = db.session.execute(
+            text("SELECT id FROM users WHERE phone = :p AND id <> :id LIMIT 1"),
+            {"p": phone, "id": uid},
+        ).scalar()
+        if dup:
+            return jsonify({"ok": False, "message": "该手机号已被其他账号使用"}), 409
+
+    if "email" in data:
+        raw = data.get("email")
+        if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+            email = None
+        else:
+            email = normalize_email(str(raw))
+            if "@" not in email:
+                return jsonify({"ok": False, "message": "邮箱格式无效"}), 400
+            dup = db.session.execute(
+                text(
+                    "SELECT id FROM users WHERE LOWER(TRIM(email)) = :e AND id <> :id LIMIT 1"
+                ),
+                {"e": email, "id": uid},
+            ).scalar()
+            if dup:
+                return jsonify({"ok": False, "message": "该邮箱已被其他账号使用"}), 409
+
+    if "agent_id" in data:
+        raw_aid = data.get("agent_id")
+        if raw_aid is None or raw_aid == "":
+            pass  # clear below
+        else:
+            try:
+                aid = int(raw_aid)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "message": "agent_id 格式无效"}), 400
+            if aid <= 0:
+                return jsonify({"ok": False, "message": "agent_id 须为正整数"}), 400
+            ag = db.session.get(Agent, aid)
+            if ag is None or (str(ag.status or "").lower() != "active"):
+                return jsonify({"ok": False, "message": "代理商不存在或已停用"}), 400
+
+    if "gender" in data:
+        g = data.get("gender")
+        if g is not None and str(g).strip() and str(g).strip() not in _VALID_USER_GENDERS:
+            return jsonify({"ok": False, "message": "性别须为：男、女、其他或留空"}), 400
+
+    if "new_password" in data:
+        npw = (data.get("new_password") or "").strip()
+        if npw:
+            ok_pw, pw_msg = validate_password_strength(npw)
+            if not ok_pw:
+                return jsonify({"ok": False, "message": pw_msg}), 400
+
+    # 组装 UPDATE
+    sets = []
+    bind: dict = {"id": uid, "now": datetime.now()}
+
+    if "username" in data:
+        raw = (data.get("username") or "").strip()
+        sets.append("username = :username")
+        bind["username"] = raw or None
+    if "gender" in data:
+        g = data.get("gender")
+        sets.append("gender = :gender")
+        if g is None or (isinstance(g, str) and not str(g).strip()):
+            bind["gender"] = None
+        else:
+            bind["gender"] = str(g).strip()
+    if "phone" in data:
+        sets.append("phone = :phone")
+        bind["phone"] = (data.get("phone") or "").strip()
+    if "email" in data:
+        sets.append("email = :email")
+        raw = data.get("email")
+        if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+            bind["email"] = None
+        else:
+            bind["email"] = normalize_email(str(raw))
+    if "agent_id" in data:
+        sets.append("agent_id = :agent_id")
+        raw_aid = data.get("agent_id")
+        if raw_aid is None or raw_aid == "":
+            bind["agent_id"] = None
+        else:
+            bind["agent_id"] = int(raw_aid)
+
+    npw = (data.get("new_password") or "").strip() if "new_password" in data else ""
+    if npw:
+        sets.append("password_hash = :password_hash")
+        bind["password_hash"] = generate_password_hash(npw, method="pbkdf2:sha256")
+        sets.append("session_version = session_version + 1")
+
+    if not sets:
+        row2 = db.session.execute(
+            text(f"SELECT {cols} FROM users WHERE id = :id"),
+            {"id": uid},
+        ).mappings().first()
+        return jsonify(
+            {"ok": True, "message": "无变更", "user": _platform_user_row_to_public(row2)}
+        )
+
+    sets.append("updated_at = :now")
+    sql = "UPDATE users SET " + ", ".join(sets) + " WHERE id = :id"
+    try:
+        db.session.execute(text(sql), bind)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"ok": False, "message": "保存失败：用户名/手机/邮箱与其他记录冲突"}), 409
+    except OperationalError:
+        db.session.rollback()
+        logging.exception("admin_platform_user_update")
+        return jsonify({"ok": False, "message": "更新 users 表失败"}), 500
+
+    row3 = db.session.execute(
+        text(f"SELECT {cols} FROM users WHERE id = :id"),
+        {"id": uid},
+    ).mappings().first()
+    return jsonify(
+        {"ok": True, "message": "已保存", "user": _platform_user_row_to_public(row3)}
+    )

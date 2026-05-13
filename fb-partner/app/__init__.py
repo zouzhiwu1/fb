@@ -117,6 +117,11 @@ def create_app():
     def admin_agent_commission_page(agent_id: int):
         return render_template("admin_agent_commission.html", agent_id=agent_id)
 
+    @app.route("/admin/users")
+    def admin_platform_users_page():
+        """管理员：按用户名/手机/邮箱查询 platform 库 users 表并维护资料。"""
+        return render_template("admin_users.html")
+
     @app.route("/admin/agents/<int:agent_id>/dashboard")
     def admin_agent_board_page(agent_id: int):
         p = partner_application_prefix()

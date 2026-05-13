@@ -1,0 +1,188 @@
+{% extends "admin_layout.html" %}
+{% set admin_nav = 'users' %}
+{% block title %}管理员 — 用户信息{% endblock %}
+{% block admin_body %}
+<h1>用户信息</h1>
+<p class="muted">按用户名、手机号或邮箱查询 platform 库中的 C 端用户，查看或修改资料（与赛果平台账号一致）。</p>
+
+<div class="card" style="padding:16px;margin-bottom:16px;">
+  <label for="q">查询关键词</label>
+  <input type="text" id="q" placeholder="用户名 / 11 位手机 / 邮箱" style="width:100%;max-width:360px;margin-top:6px;">
+  <button type="button" class="primary" id="btn_search" style="margin-top:12px;">查询</button>
+</div>
+
+<div id="results_wrap" class="card" style="padding:0;display:none;overflow-x:auto;">
+  <table class="dash" style="width:100%;font-size:13px;border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="padding:8px;border-bottom:1px solid #e2e8f0;">ID</th>
+        <th style="padding:8px;border-bottom:1px solid #e2e8f0;">用户名</th>
+        <th style="padding:8px;border-bottom:1px solid #e2e8f0;">手机</th>
+        <th style="padding:8px;border-bottom:1px solid #e2e8f0;">邮箱</th>
+        <th style="padding:8px;border-bottom:1px solid #e2e8f0;">操作</th>
+      </tr>
+    </thead>
+    <tbody id="tbody_results"></tbody>
+  </table>
+</div>
+
+<div id="panel_edit" class="card" style="padding:16px;display:none;margin-top:16px;">
+  <h2 style="font-size:1rem;margin:0 0 12px 0;">编辑用户</h2>
+  <input type="hidden" id="e_id">
+  <p class="muted" id="e_meta"></p>
+  <label>用户名</label>
+  <input type="text" id="e_username" maxlength="64" style="width:100%;max-width:400px;">
+  <label>性别</label>
+  <select id="e_gender" style="width:100%;max-width:200px;margin-top:4px;">
+    <option value="">（未设置）</option>
+    <option value="男">男</option>
+    <option value="女">女</option>
+    <option value="其他">其他</option>
+  </select>
+  <label>手机号</label>
+  <input type="tel" id="e_phone" maxlength="11" style="width:100%;max-width:200px;">
+  <label>邮箱</label>
+  <input type="email" id="e_email" style="width:100%;max-width:400px;">
+  <label>推广 agent_id（留空表示清除归因）</label>
+  <input type="number" id="e_agent_id" min="1" placeholder="留空清除" style="width:100%;max-width:200px;">
+  <label>重置密码（可选）</label>
+  <input type="password" id="e_new_password" placeholder="不修改请留空" autocomplete="new-password" style="width:100%;max-width:320px;">
+  <div style="margin-top:16px;">
+    <button type="button" class="primary" id="btn_save">保存</button>
+  </div>
+</div>
+
+<div id="msg" class="msg error" style="display:none;margin-top:12px;"></div>
+<p style="margin-top:20px;"><a class="text-link" href="{{ partner_url_prefix }}/admin/agents">返回代理商一览</a></p>
+{% endblock %}
+{% block admin_extra_js %}
+<script>
+(function () {
+  var token = localStorage.getItem('partner_admin_jwt');
+  var hdr = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+  function showErr(t) {
+    var m = document.getElementById('msg');
+    m.textContent = t;
+    m.style.display = 'block';
+  }
+  function hideErr() {
+    document.getElementById('msg').style.display = 'none';
+  }
+  function parseJson(r) {
+    return r.text().then(function (t) {
+      try { return t ? JSON.parse(t) : {}; } catch (e) { return { ok: false, message: '非 JSON 响应' }; }
+    });
+  }
+
+  function fillEdit(u) {
+    document.getElementById('e_id').value = u.id;
+    var meta = 'ID ' + u.id + ' · 已设密码：' + (u.password_set ? '是' : '否');
+    if (u.wechat_mp_openid_hint) meta += ' · 微信：' + u.wechat_mp_openid_hint;
+    if (u.agent_id != null) meta += ' · agent_id ' + u.agent_id;
+    document.getElementById('e_meta').textContent = meta;
+    document.getElementById('e_username').value = u.username || '';
+    document.getElementById('e_gender').value = u.gender || '';
+    document.getElementById('e_phone').value = u.phone || '';
+    document.getElementById('e_email').value = u.email || '';
+    document.getElementById('e_agent_id').value = u.agent_id != null ? String(u.agent_id) : '';
+    document.getElementById('e_new_password').value = '';
+    document.getElementById('panel_edit').style.display = 'block';
+    hideErr();
+  }
+
+  function loadUser(id) {
+    fetch(partnerPath('/api/partner/admin/platform-users/' + encodeURIComponent(id)), { headers: hdr })
+      .then(parseJson)
+      .then(function (j) {
+        if (j.ok === false && (j.message || '').indexOf('登录') >= 0) {
+          localStorage.removeItem('partner_admin_jwt');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        if (!j.ok) { showErr(j.message || '加载失败'); return; }
+        fillEdit(j.user);
+      })
+      .catch(function () { showErr('网络或服务异常'); });
+  }
+
+  document.getElementById('btn_search').onclick = function () {
+    hideErr();
+    var q = (document.getElementById('q').value || '').trim();
+    if (!q) { showErr('请输入查询关键词'); return; }
+    fetch(partnerPath('/api/partner/admin/platform-users/search?q=' + encodeURIComponent(q)), { headers: hdr })
+      .then(parseJson)
+      .then(function (j) {
+        if (j.ok === false && (j.message || '').indexOf('登录') >= 0) {
+          localStorage.removeItem('partner_admin_jwt');
+          window.location.href = partnerPath('/admin/login');
+          return;
+        }
+        if (!j.ok) { showErr(j.message || '查询失败'); return; }
+        var users = j.users || [];
+        var tb = document.getElementById('tbody_results');
+        var wrap = document.getElementById('results_wrap');
+        if (!users.length) {
+          wrap.style.display = 'block';
+          tb.innerHTML = '<tr><td colspan="5" class="muted" style="padding:12px;">无匹配用户</td></tr>';
+          document.getElementById('panel_edit').style.display = 'none';
+          return;
+        }
+        wrap.style.display = 'block';
+        tb.innerHTML = users.map(function (u) {
+          return '<tr>'
+            + '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + esc(u.id) + '</td>'
+            + '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + esc(u.username || '—') + '</td>'
+            + '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + esc(u.phone) + '</td>'
+            + '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + esc(u.email || '—') + '</td>'
+            + '<td style="padding:8px;border-bottom:1px solid #e2e8f0;"><a class="text-link" href="#" data-uid="' + esc(u.id) + '">查看/编辑</a></td>'
+            + '</tr>';
+        }).join('');
+        Array.prototype.forEach.call(tb.querySelectorAll('a[data-uid]'), function (a) {
+          a.onclick = function (e) {
+            e.preventDefault();
+            loadUser(a.getAttribute('data-uid'));
+          };
+        });
+        if (users.length === 1) loadUser(users[0].id);
+      })
+      .catch(function () { showErr('网络或服务异常'); });
+  };
+
+  document.getElementById('btn_save').onclick = function () {
+    hideErr();
+    var id = document.getElementById('e_id').value;
+    if (!id) { showErr('请先查询并选择用户'); return; }
+    var body = {
+      username: (document.getElementById('e_username').value || '').trim(),
+      gender: document.getElementById('e_gender').value || null,
+      phone: (document.getElementById('e_phone').value || '').trim(),
+      email: (document.getElementById('e_email').value || '').trim(),
+    };
+    var aidRaw = (document.getElementById('e_agent_id').value || '').trim();
+    if (aidRaw === '') body.agent_id = null;
+    else {
+      var n = parseInt(aidRaw, 10);
+      if (!isFinite(n) || n < 1) { showErr('agent_id 须为正整数或留空'); return; }
+      body.agent_id = n;
+    }
+    var npw = (document.getElementById('e_new_password').value || '').trim();
+    if (npw) body.new_password = npw;
+
+    fetch(partnerPath('/api/partner/admin/platform-users/' + encodeURIComponent(id)), {
+      method: 'PUT',
+      headers: hdr,
+      body: JSON.stringify(body)
+    }).then(parseJson).then(function (j) {
+      if (!j.ok) { showErr(j.message || '保存失败'); return; }
+      fillEdit(j.user);
+      alert(j.message || '已保存');
+    }).catch(function () { showErr('网络或服务异常'); });
+  };
+})();
+</script>
+{% endblock %}

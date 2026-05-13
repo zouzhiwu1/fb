@@ -25,6 +25,8 @@
   <span class="sep">|</span>
   <a href="{{ partner_url_prefix }}/">首页</a>
   <span class="sep">|</span>
+  <a href="{{ partner_url_prefix }}/admin/users"{% if admin_nav == 'users' %} class="active"{% endif %}>用户信息</a>
+  <span class="sep">|</span>
   <a href="#" id="admin_nav_logout">退出登录</a>
 </nav>
 {% block admin_body %}{% endblock %}
@@ -43,6 +45,8 @@
     headers: { 'Authorization': 'Bearer ' + token }
   }).then(function (r) { return r.json(); }).then(function (j) {
     if (j.ok && j.role === 'root') {
+      var path = window.location.pathname || '';
+      if (path.indexOf('/admin/users') >= 0) return;
       window.location.href = partnerPath('/admin/managers');
     }
   }).catch(function () {});
