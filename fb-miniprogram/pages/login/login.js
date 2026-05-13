@@ -7,6 +7,8 @@ Page({
     phone: '',
     password: '',
     loading: false,
+    /** 暂关：无短信验号时防刷拉新；恢复注册入口时改为 true */
+    showRegisterEntry: false,
   },
 
   onLoad(options) {

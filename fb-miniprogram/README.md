@@ -10,7 +10,7 @@
 | 注册 | `(auth)/register` | 用户名、性别、密码、手机验证码、邮箱 |
 | 首页 | `(app)/home` | 入口菜单、退出登录 |
 | 曲线图查询 | `(app)/curves` | 日期/球队搜索；图片经 `wx.downloadFile` 带 JWT 拉取 |
-| 账户资料 | `(app)/account` | 资料展示、改密码/邮箱/手机（下拉刷新） |
+| 账户资料 | `(app)/account` | 资料展示、改密码/邮箱（下拉刷新）；换绑手机号请使用网页端账户页 |
 | 会员状态 | `(app)/membership` | 与 `/api/membership/status` 一致（下拉刷新） |
 | 充值 | `(app)/recharge` | `payment_channel: wechat_mp` 调用 `wx.requestPayment`；网页/默认仍为支付宝 |
 | 充值记录 | `(app)/records` | `GET /api/pay/orders`（下拉刷新） |

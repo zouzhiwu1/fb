@@ -449,20 +449,17 @@ def bootstrap_agent():
     data = request.get_json(silent=True) or {}
     login_name = normalize_email(data.get("login_name"))
     password = data.get("password") or ""
-    agent_code = (data.get("agent_code") or "").strip()
     display_name = (data.get("display_name") or login_name).strip()
-    if not login_name or not password or not agent_code:
-        return jsonify({"ok": False, "message": "缺少 login_name/password/agent_code"}), 400
+    if not login_name or not password:
+        return jsonify({"ok": False, "message": "缺少 login_name/password"}), 400
     ok_ln, ln_msg = validate_agent_login_email(login_name)
     if not ok_ln:
         return jsonify({"ok": False, "message": ln_msg}), 400
     ok_pw, pw_msg = validate_password_strength(str(password).strip())
     if not ok_pw:
         return jsonify({"ok": False, "message": pw_msg}), 400
-    if Agent.query.filter(
-        (func.lower(Agent.login_name) == login_name) | (Agent.agent_code == agent_code)
-    ).first():
-        return jsonify({"ok": False, "message": "账号或推广码已存在"}), 400
+    if Agent.query.filter(func.lower(Agent.login_name) == login_name).first():
+        return jsonify({"ok": False, "message": "登录名已存在"}), 400
     phone_raw = (data.get("phone") or "").strip()
     phone = phone_raw or None
     if phone:
@@ -498,7 +495,7 @@ def bootstrap_agent():
             return jsonify({"ok": False, "message": h_msg}), 400
 
     agent = Agent(
-        agent_code=agent_code,
+        agent_code="__tmp_" + secrets.token_hex(11),
         login_name=login_name,
         password_hash=generate_password_hash(password),
         display_name=display_name,
@@ -512,6 +509,8 @@ def bootstrap_agent():
         current_rate=data.get("current_rate") or 0,
     )
     db.session.add(agent)
+    db.session.flush()
+    agent.agent_code = str(agent.id)
     db.session.commit()
     if mp_promo_env_configured():
         if not save_agent_promo_miniprogram_qr(agent.id):

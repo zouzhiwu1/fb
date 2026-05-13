@@ -120,13 +120,13 @@ PARTNER_PROMO_MP_CODE_ENV_VERSION=trial
 
 ## 首个代理商（仅运维/无管理员时的捷径）
 
-仍可使用 `bootstrap-agent`（可不填档案字段）；正式流程推荐由管理员在 `/admin` 开户。
+仍可使用 `bootstrap-agent`（可不填档案字段；**无需**传 `agent_code`，系统会将其设为与新建行主键相同的字符串）。正式流程推荐由管理员在 `/admin` 开户。
 
 ```bash
 curl -s -X POST http://127.0.0.1:5002/api/partner/auth/bootstrap-agent \
   -H "Content-Type: application/json" \
   -H "X-Partner-Bootstrap-Key: $KEY" \
-  -d '{"login_name":"demo","password":"your-pass","agent_code":"D001","display_name":"演示","current_rate":0.08}'
+  -d '{"login_name":"demo","password":"your-pass","display_name":"演示","current_rate":0.08}'
 ```
 
 ## 本地运行

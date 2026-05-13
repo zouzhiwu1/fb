@@ -22,5 +22,5 @@
     微信一键登录
   </button>
 
-  <navigator url="/pages/register/register" open-type="navigate" class="link">没有账号？去注册</navigator>
+  <navigator wx:if="{{showRegisterEntry}}" url="/pages/register/register" open-type="navigate" class="link">没有账号？去注册</navigator>
 </view>

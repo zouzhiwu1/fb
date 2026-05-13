@@ -43,8 +43,6 @@
   <input type="tel" id="e_phone" maxlength="11" style="width:100%;max-width:200px;">
   <label>邮箱</label>
   <input type="email" id="e_email" style="width:100%;max-width:400px;">
-  <label>推广 agent_id（留空表示清除归因）</label>
-  <input type="number" id="e_agent_id" min="1" placeholder="留空清除" style="width:100%;max-width:200px;">
   <label>重置密码（可选）</label>
   <input type="password" id="e_new_password" placeholder="不修改请留空" autocomplete="new-password" style="width:100%;max-width:320px;">
   <div style="margin-top:16px;">
@@ -83,13 +81,11 @@
     document.getElementById('e_id').value = u.id;
     var meta = 'ID ' + u.id + ' · 已设密码：' + (u.password_set ? '是' : '否');
     if (u.wechat_mp_openid_hint) meta += ' · 微信：' + u.wechat_mp_openid_hint;
-    if (u.agent_id != null) meta += ' · agent_id ' + u.agent_id;
     document.getElementById('e_meta').textContent = meta;
     document.getElementById('e_username').value = u.username || '';
     document.getElementById('e_gender').value = u.gender || '';
     document.getElementById('e_phone').value = u.phone || '';
     document.getElementById('e_email').value = u.email || '';
-    document.getElementById('e_agent_id').value = u.agent_id != null ? String(u.agent_id) : '';
     document.getElementById('e_new_password').value = '';
     document.getElementById('panel_edit').style.display = 'block';
     hideErr();
@@ -163,13 +159,6 @@
       phone: (document.getElementById('e_phone').value || '').trim(),
       email: (document.getElementById('e_email').value || '').trim(),
     };
-    var aidRaw = (document.getElementById('e_agent_id').value || '').trim();
-    if (aidRaw === '') body.agent_id = null;
-    else {
-      var n = parseInt(aidRaw, 10);
-      if (!isFinite(n) || n < 1) { showErr('agent_id 须为正整数或留空'); return; }
-      body.agent_id = n;
-    }
     var npw = (document.getElementById('e_new_password').value || '').trim();
     if (npw) body.new_password = npw;
 

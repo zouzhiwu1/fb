@@ -73,7 +73,7 @@ def _init_users_table(app):
             )
         )
         ag = Agent(
-            agent_code="PU01",
+            agent_code="__tmp_init",
             login_name="pu_agent@test.local",
             password_hash=generate_password_hash("x"),
             display_name="PU",
@@ -82,6 +82,7 @@ def _init_users_table(app):
         db.session.add(ag)
         db.session.flush()
         aid = ag.id
+        ag.agent_code = str(aid)
         db.session.execute(
             text(
                 """

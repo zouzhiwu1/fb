@@ -5,9 +5,6 @@
 <style>
   button.primary.admin { background: #1e3a5f; }
   button.primary.admin:hover { background: #152a45; }
-  .code-hint.ok { color: #15803d; }
-  .code-hint.bad { color: #b91c1c; }
-  .code-hint.wait { color: #64748b; }
 </style>
 {% endblock %}
 {% block admin_body %}
@@ -34,15 +31,12 @@
 <label for="payout_holder_name">收款真实姓名</label>
 <input id="payout_holder_name" name="payout_holder_name" type="text" autocomplete="name" placeholder="与收款账户实名一致" required>
 
-<h2 class="section" style="font-size:1rem;color:#64748b;">登录凭证与推广（密码必填）</h2>
+<h2 class="section" style="font-size:1rem;color:#64748b;">登录凭证（密码必填）</h2>
 <label for="login_name">登录名（邮箱）</label>
 <input id="login_name" name="login_name" type="email" autocomplete="username" placeholder="建议使用邮箱，如 name@example.com" required maxlength="128">
 <label for="password">登录密码（必填）</label>
 <input id="password" name="password" type="password" autocomplete="new-password" placeholder="字母+数字+符号，至少 8 位" required minlength="8">
 <p class="muted" style="margin-top:-8px;margin-bottom:12px;">至少 8 位，须含英文字母、数字和符号，不能含空格；不设密码则无法登录，请务必告知代理商。</p>
-<label for="agent_code">推广码</label>
-<input id="agent_code" name="agent_code" type="text" autocomplete="off" placeholder="全局唯一，如 D001（不区分大小写）" required>
-<p id="agent_code_hint" class="muted code-hint" style="font-size:12px;margin-top:-8px;margin-bottom:12px;min-height:18px;"></p>
 <label for="current_rate">本月分润率（可选，小数）</label>
 <input id="current_rate" name="current_rate" type="text" placeholder="留空为 0，如 0.08 表示 8%">
 
@@ -108,42 +102,6 @@
     if (!/[!@#$%^&*()_+\-=[\]{}|;:,.<>?/~`'"']/.test(p)) return '密码须包含符号';
     return '';
   }
-  var agentCodeTimer;
-  function runAgentCodeCheck() {
-    var hint = document.getElementById('agent_code_hint');
-    var code = document.getElementById('agent_code').value.trim();
-    if (!code) {
-      hint.textContent = '';
-      hint.className = 'muted code-hint';
-      return;
-    }
-    hint.className = 'muted code-hint wait';
-    hint.textContent = '校验中…';
-    fetch(partnerPath('/api/partner/admin/agents/check-agent-code?code=' + encodeURIComponent(code)), { headers: { 'Authorization': 'Bearer ' + token } })
-      .then(parseJsonResponse)
-      .then(function (x) {
-        if (!x.j || !x.j.ok) {
-          hint.textContent = '';
-          hint.className = 'muted code-hint';
-          return;
-        }
-        if (x.j.available) {
-          hint.textContent = x.j.message || '可以使用';
-          hint.className = 'muted code-hint ok';
-        } else {
-          hint.textContent = x.j.message || '已被使用';
-          hint.className = 'muted code-hint bad';
-        }
-      })
-      .catch(function () {
-        hint.textContent = '';
-        hint.className = 'muted code-hint';
-      });
-  }
-  document.getElementById('agent_code').addEventListener('blur', function () {
-    clearTimeout(agentCodeTimer);
-    agentCodeTimer = setTimeout(runAgentCodeCheck, 200);
-  });
   document.getElementById('reg_form').addEventListener('submit', function (ev) {
     ev.preventDefault();
     hideErr();
@@ -178,7 +136,6 @@
       payout_holder_name: pholder,
       login_name: loginName,
       password: pwd,
-      agent_code: document.getElementById('agent_code').value.trim(),
       current_rate: document.getElementById('current_rate').value.trim()
     };
     if (body.current_rate === '') delete body.current_rate;

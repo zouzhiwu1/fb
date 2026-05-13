@@ -73,7 +73,6 @@ def test_monthly_board_ok_for_agent(client):
         json={
             "login_name": "dash_ag@test.local",
             "password": "Dash1!dashpw",
-            "agent_code": "DASH01",
             "display_name": "看板测",
         },
         headers=h,
@@ -109,7 +108,6 @@ def test_partner_put_me_profile_and_password(client):
         json={
             "login_name": "acc_ag@test.local",
             "password": "orig-pw-12",
-            "agent_code": "ACC01",
             "display_name": "账户测",
             "phone": "13600001111",
         },
@@ -134,7 +132,6 @@ def test_partner_put_me_profile_and_password(client):
         json={
             "login_name": "acc_ag2@test.local",
             "password": "other-pw-12",
-            "agent_code": "ACC02",
             "phone": "13600002222",
         },
         headers=h,
@@ -213,7 +210,6 @@ def test_partner_promo_links(client, monkeypatch):
         json={
             "login_name": "promo_ag@test.local",
             "password": "promo-pw-99",
-            "agent_code": "PROMO1",
             "display_name": "推广测",
         },
         headers=h,
@@ -230,15 +226,17 @@ def test_partner_promo_links(client, monkeypatch):
     assert r2.status_code == 200
     body = r2.get_json()
     assert body.get("ok") is True
-    assert body.get("agent_code") == "PROMO1"
-    aid = str(body.get("agent_id"))
+    aid_num = body.get("agent_id")
+    code = body.get("agent_code")
+    assert code == str(aid_num)
+    aid = str(aid_num)
     ch = {c["id"]: c for c in body["channels"]}
     assert "miniprogram" in ch and ch["miniprogram"]["qr_image_data_url"].startswith("data:image/png;base64,")
     assert aid in ch["miniprogram"]["qr_image_data_url"]
     assert "web" in ch and ch["web"]["qr_url"].startswith("https://h5.example.com/register?")
-    assert aid in ch["web"]["qr_url"] and "PROMO1" in ch["web"]["qr_url"]
+    assert aid in ch["web"]["qr_url"] and code in ch["web"]["qr_url"]
     assert ch["android"]["qr_url"].startswith("https://dl.example.com/") and aid in ch["android"]["qr_url"]
-    assert "PROMO1" in ch["ios"]["qr_url"]
+    assert code in ch["ios"]["qr_url"]
     assert ch["miniprogram"].get("wechat_scene")
     assert "agent_id=" in ch["miniprogram"].get("miniprogram_path", "")
 
@@ -294,7 +292,6 @@ def test_admin_agent_monthly_board_api(client, app):
         json={
             "login_name": "ag_board@test.local",
             "password": "Pw1!bdbdbd",
-            "agent_code": "BD01",
             "real_name": "看板代查",
             "age": 30,
             "phone": "13611112222",
@@ -418,7 +415,6 @@ def test_admin_register_agent_flow(client):
         json={
             "login_name": "ag1@test.local",
             "password": "ag-pass-1",
-            "agent_code": "T001",
             "real_name": "张三",
             "age": 30,
             "phone": "13800138000",
@@ -430,6 +426,8 @@ def test_admin_register_agent_flow(client):
         headers=auth,
     )
     assert r2.status_code == 200 and r2.get_json()["ok"] is True
+    ag = r2.get_json()["agent"]
+    assert ag["agent_code"] == str(ag["id"])
     r3 = client.post(
         "/api/partner/auth/login",
         json={"login_name": "ag1@test.local", "password": "ag-pass-1"},
@@ -437,7 +435,8 @@ def test_admin_register_agent_flow(client):
     assert r3.status_code == 200 and r3.get_json()["ok"] is True
 
 
-def test_admin_agent_code_unique_case_insensitive(client):
+def test_admin_agent_code_equals_agent_id(client):
+    """推广码由服务端设为 str(agents.id)，与客户端是否传 agent_code 无关。"""
     h = {"X-Partner-Bootstrap-Key": "unit-test-bootstrap-key", "Content-Type": "application/json"}
     client.post(
         "/api/partner/auth/bootstrap-admin",
@@ -455,7 +454,6 @@ def test_admin_agent_code_unique_case_insensitive(client):
         json={
             "login_name": "uq_ag_a@test.local",
             "password": "pw-uu-11",
-            "agent_code": "UniqueCODE",
             "real_name": "甲",
             "age": 20,
             "phone": "13100000001",
@@ -466,12 +464,13 @@ def test_admin_agent_code_unique_case_insensitive(client):
         headers=auth,
     )
     assert ok.status_code == 200
-    r_dup = client.post(
+    ag = ok.get_json()["agent"]
+    assert ag["agent_code"] == str(ag["id"])
+    ok2 = client.post(
         "/api/partner/admin/agents",
         json={
             "login_name": "uq_ag_b@test.local",
             "password": "pw-uu-22",
-            "agent_code": "uniquecode",
             "real_name": "乙",
             "age": 21,
             "phone": "13100000002",
@@ -481,8 +480,10 @@ def test_admin_agent_code_unique_case_insensitive(client):
         },
         headers=auth,
     )
-    assert r_dup.status_code == 400
-    assert "推广码" in r_dup.get_json().get("message", "")
+    assert ok2.status_code == 200
+    ag2 = ok2.get_json()["agent"]
+    assert ag2["agent_code"] == str(ag2["id"])
+    assert ag["agent_code"] != ag2["agent_code"]
 
 
 def test_admin_check_agent_code_endpoint(client):
@@ -506,7 +507,6 @@ def test_admin_check_agent_code_endpoint(client):
         json={
             "login_name": "ck_ag@test.local",
             "password": "Pw1!ckagent",
-            "agent_code": "CkCode99",
             "real_name": "丙",
             "age": 22,
             "phone": "13100000003",
@@ -518,9 +518,10 @@ def test_admin_check_agent_code_endpoint(client):
     )
     assert cr.status_code == 200
     aid = cr.get_json()["agent"]["id"]
+    code = str(aid)
 
     c1 = client.get(
-        "/api/partner/admin/agents/check-agent-code?code=ckcode99",
+        f"/api/partner/admin/agents/check-agent-code?code={code}",
         headers=auth,
     )
     assert c1.status_code == 200 and c1.get_json()["available"] is False
@@ -532,7 +533,7 @@ def test_admin_check_agent_code_endpoint(client):
     assert c2.status_code == 200 and c2.get_json()["available"] is True
 
     c3 = client.get(
-        f"/api/partner/admin/agents/check-agent-code?code=ckcode99&exclude_id={aid}",
+        f"/api/partner/admin/agents/check-agent-code?code={code}&exclude_id={aid}",
         headers=auth,
     )
     assert c3.status_code == 200 and c3.get_json()["available"] is True
@@ -556,7 +557,6 @@ def test_admin_get_put_agent(client):
         json={
             "login_name": "ag2@test.local",
             "password": "Pw2!agtwoo",
-            "agent_code": "T002",
             "real_name": "李四",
             "age": 40,
             "phone": "13900139000",
@@ -568,6 +568,7 @@ def test_admin_get_put_agent(client):
     )
     assert r2.status_code == 200
     aid = r2.get_json()["agent"]["id"]
+    assert r2.get_json()["agent"]["agent_code"] == str(aid)
     rg = client.get(f"/api/partner/admin/agents/{aid}", headers=auth)
     assert rg.status_code == 200 and rg.get_json()["agent"]["login_name"] == "ag2@test.local"
     ru = client.put(
@@ -580,7 +581,6 @@ def test_admin_get_put_agent(client):
             "payout_account": "13900139000",
             "payout_holder_name": "李四改",
             "login_name": "ag2@test.local",
-            "agent_code": "T002",
             "display_name": "李四改",
             "current_rate": 0.1,
             "status": "active",
@@ -588,11 +588,11 @@ def test_admin_get_put_agent(client):
         headers=auth,
     )
     assert ru.status_code == 200 and ru.get_json()["agent"]["real_name"] == "李四改"
+    assert ru.get_json()["agent"]["agent_code"] == str(aid)
     rp = client.put(
         f"/api/partner/admin/agents/{aid}",
         json={
             "login_name": "ag2@test.local",
-            "agent_code": "T002",
             "real_name": "李四改",
             "age": 41,
             "phone": "13900139000",
@@ -640,7 +640,6 @@ def test_admin_delete_agent_disabled(client):
         json={
             "login_name": "ag_del@test.local",
             "password": "Pw1!delag01",
-            "agent_code": "DEL01",
             "real_name": "保留",
             "age": 20,
             "phone": "13700000001",

@@ -6,15 +6,12 @@
   button.primary.admin:hover { background: #152a45; }
   button.secondary { width: 100%; padding: 12px; margin-top: 8px; background: #e2e8f0; color: #475569; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
   button.secondary:hover { background: #cbd5e1; }
-  .code-hint.ok { color: #15803d; }
-  .code-hint.bad { color: #b91c1c; }
-  .code-hint.wait { color: #64748b; }
   .msg.success { display: block !important; background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
 </style>
 {% endblock %}
 {% block admin_body %}
 <h1>修改代理商</h1>
-<p class="muted">修改档案、登录名、推广码、状态或重置密码（留空则不修改密码）。</p>
+<p class="muted">修改档案、登录名、状态或重置密码（留空则不修改密码）。推广码与库内主键一致，由系统自动维护。</p>
 <div id="form_wrap">
   <p class="muted">加载中…</p>
 </div>
@@ -91,9 +88,7 @@
       + '<input type="hidden" id="ed_agent_id" value="' + String(a.id) + '">'
       + '<label for="ed_login_name">登录名（邮箱）</label>'
       + '<input id="ed_login_name" type="email" autocomplete="off" value="" maxlength="128">'
-      + '<label for="ed_agent_code">推广码</label>'
-      + '<input id="ed_agent_code" type="text" autocomplete="off" value="">'
-      + '<p id="ed_agent_code_hint" class="muted code-hint" style="font-size:12px;margin-top:-8px;"></p>'
+      + '<p class="muted" style="font-size:12px;margin:8px 0 12px;">推广码（与库内 ID 一致，系统自动）：<strong id="ed_agent_code_ro"></strong></p>'
       + '<label for="ed_display_name">显示名（可选）</label>'
       + '<input id="ed_display_name" type="text" placeholder="默认可与姓名一致" value="">'
       + '<label for="ed_real_name">用户姓名</label>'
@@ -125,7 +120,7 @@
       + '<button type="button" class="secondary" id="ed_cancel">取消（返回查看）</button>';
     document.getElementById('form_wrap').innerHTML = html;
     document.getElementById('ed_login_name').value = a.login_name || '';
-    document.getElementById('ed_agent_code').value = a.agent_code || '';
+    document.getElementById('ed_agent_code_ro').textContent = String(a.id != null ? a.id : '');
     document.getElementById('ed_display_name').value = a.display_name || '';
     document.getElementById('ed_real_name').value = a.real_name || '';
     document.getElementById('ed_age').value = a.age != null ? String(a.age) : '';
@@ -136,44 +131,6 @@
     document.getElementById('ed_current_rate').value = a.current_rate != null ? String(a.current_rate) : '';
     document.getElementById('ed_status').value = (a.status === 'disabled') ? 'disabled' : 'active';
     document.getElementById('ed_password').value = '';
-    var edCodeTimer;
-    function runEdAgentCodeCheck() {
-      var hint = document.getElementById('ed_agent_code_hint');
-      var code = document.getElementById('ed_agent_code').value.trim();
-      if (!code) {
-        hint.textContent = '';
-        hint.className = 'muted code-hint';
-        return;
-      }
-      hint.className = 'muted code-hint wait';
-      hint.textContent = '校验中…';
-      var url = partnerPath('/api/partner/admin/agents/check-agent-code?code=' + encodeURIComponent(code) + '&exclude_id=' + encodeURIComponent(String(agentId)));
-      fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
-        .then(parseJsonResponse)
-        .then(function (x) {
-          if (!x.j || !x.j.ok) {
-            hint.textContent = '';
-            hint.className = 'muted code-hint';
-            return;
-          }
-          if (x.j.available) {
-            hint.textContent = x.j.message || '可以使用';
-            hint.className = 'muted code-hint ok';
-          } else {
-            hint.textContent = x.j.message || '已被使用';
-            hint.className = 'muted code-hint bad';
-          }
-        })
-        .catch(function () {
-          hint.textContent = '';
-          hint.className = 'muted code-hint';
-        });
-    }
-    document.getElementById('ed_agent_code').addEventListener('blur', function () {
-      clearTimeout(edCodeTimer);
-      edCodeTimer = setTimeout(runEdAgentCodeCheck, 200);
-    });
-    runEdAgentCodeCheck();
     document.getElementById('ed_cancel').addEventListener('click', function () {
       window.location.href = partnerPath('/admin/agents/' + agentId);
     });
@@ -191,7 +148,6 @@
       if (!pholder) { showErr('请填写收款真实姓名'); return; }
       var body = {
         login_name: ln,
-        agent_code: document.getElementById('ed_agent_code').value.trim(),
         display_name: document.getElementById('ed_display_name').value.trim(),
         real_name: document.getElementById('ed_real_name').value.trim(),
         age: document.getElementById('ed_age').value,

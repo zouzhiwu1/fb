@@ -52,6 +52,11 @@ _SETTLE_MIGRATE_MSG = (
 _SETTLEMENT_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
+def _pending_agent_code_placeholder() -> str:
+    """插入前临时占位；flush 拿到自增 id 后须改为 str(agent.id)。"""
+    return "__tmp_" + uuid.uuid4().hex[:22]
+
+
 def _agent_code_taken(agent_code: str, exclude_agent_id: int | None) -> bool:
     """推广码全局唯一，比较时不区分大小写（与库唯一约束互补，避免 D001 / d001 并存）。"""
     raw = (agent_code or "").strip()
@@ -426,7 +431,6 @@ def create_agent():
     data = request.get_json(silent=True) or {}
     login_name = normalize_email(data.get("login_name"))
     password = data.get("password") or ""
-    agent_code = (data.get("agent_code") or "").strip()
     real_name = (data.get("real_name") or "").strip()
     phone = (data.get("phone") or "").strip()
     pch = (data.get("payout_channel") or "").strip().lower()
@@ -434,8 +438,8 @@ def create_agent():
     pholder = (data.get("payout_holder_name") or "").strip()
     age_raw = data.get("age")
 
-    if not login_name or not password or not agent_code:
-        return jsonify({"ok": False, "message": "请填写登录名、初始密码、推广码"}), 400
+    if not login_name or not password:
+        return jsonify({"ok": False, "message": "请填写登录名、初始密码"}), 400
     ok_ln, ln_msg = validate_agent_login_email(login_name)
     if not ok_ln:
         return jsonify({"ok": False, "message": ln_msg}), 400
@@ -474,18 +478,11 @@ def create_agent():
     try:
         if Agent.query.filter(func.lower(Agent.login_name) == login_name).first():
             return jsonify({"ok": False, "message": "该登录名已存在"}), 400
-        if _agent_code_taken(agent_code, None):
-            return jsonify(
-                {
-                    "ok": False,
-                    "message": "推广码已存在，请更换（全局唯一，不区分大小写）。",
-                }
-            ), 400
         if Agent.query.filter_by(phone=phone).first():
             return jsonify({"ok": False, "message": "该电话号码已被使用"}), 400
 
         agent = Agent(
-            agent_code=agent_code,
+            agent_code=_pending_agent_code_placeholder(),
             login_name=login_name,
             password_hash=generate_password_hash(password),
             display_name=display_name,
@@ -499,6 +496,8 @@ def create_agent():
             current_rate=current_rate,
         )
         db.session.add(agent)
+        db.session.flush()
+        agent.agent_code = str(agent.id)
         db.session.commit()
         if mp_promo_env_configured():
             if not save_agent_promo_miniprogram_qr(agent.id):
@@ -520,7 +519,7 @@ def create_agent():
         return jsonify(
             {
                 "ok": False,
-                "message": "数据冲突：登录名、推广码（须唯一）或电话可能已存在。",
+                "message": "数据冲突：登录名或电话可能已存在。",
             }
         ), 400
     except OperationalError:
@@ -855,19 +854,6 @@ def update_agent(agent_id: int):
                 return jsonify({"ok": False, "message": "该登录名已被使用"}), 400
             agent.login_name = login_name
 
-        if "agent_code" in data:
-            agent_code = (data.get("agent_code") or "").strip()
-            if not agent_code:
-                return jsonify({"ok": False, "message": "推广码不能为空"}), 400
-            if _agent_code_taken(agent_code, agent_id):
-                return jsonify(
-                    {
-                        "ok": False,
-                        "message": "推广码已存在，请更换（全局唯一，不区分大小写）。",
-                    }
-                ), 400
-            agent.agent_code = agent_code
-
         if "phone" in data:
             phone = (data.get("phone") or "").strip()
             ok_ph, ph_msg = validate_cn_mobile(phone)
@@ -955,6 +941,7 @@ def update_agent(agent_id: int):
             agent.password_hash = generate_password_hash(pws)
             agent.session_version = int(agent.session_version or 1) + 1
 
+        agent.agent_code = str(agent.id)
         db.session.commit()
         promo_regenerated: bool | None = None
         promo_qr_message: str | None = None
@@ -978,7 +965,7 @@ def update_agent(agent_id: int):
         return jsonify(
             {
                 "ok": False,
-                "message": "数据冲突：登录名、推广码（须唯一）或电话可能重复。",
+                "message": "数据冲突：登录名或电话可能重复。",
             }
         ), 400
     except OperationalError:
