@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-批处理3：根据综合评估表（car_{YYYYMMDD}.xlsx）生成oupei指数曲线图和kailizhishu曲线图。
+批处理3：根据综合评估表（car_{YYYYMMDD}.xlsx）生成欧赔分歧指数曲线图和kailizhishu曲线图。
 参见 design.md 第 3.3 节。
 详细日志写入 logs/plot_car{YYYYMMDDHH}.log。
 
 曲线节点数量由综合评估表中该场比赛的时间点数量决定，不固定。
 
-- oupei指数曲线图：主、平、客三条曲线。第 1 个节点为初指（D/E/F 列），
+- 欧赔分歧指数曲线图：主、平、客三条曲线。第 1 个节点为初指（D/E/F 列），
   其余节点为各时间点jishipan（G/H/I 列），节点数 = 1 + 时间点个数。X 轴为「初指」+ 第 C 列各时间点。
 - kailizhishu曲线图：主、平、客三条曲线。X 轴为时间（第 C 列），Y 轴为 J/K/L 列，节点数 = 时间点个数。
 
@@ -48,7 +48,7 @@ NUM_COLUMNS = 12
 PLOT_TIME_XLABEL = "\u65f6\u95f4\u70b9"
 PLOT_KELLY_YLABEL = "\u51ef\u5229\u6307\u6570"
 PLOT_KELLY_TITLE = "\u51ef\u5229\u6307\u6570\u66f2\u7ebf\u56fe"
-PLOT_OUPEI_TITLE = "oupei\u6307\u6570\u66f2\u7ebf\u56fe"
+PLOT_OUPEI_TITLE = "\u6b27\u8d54\u5206\u6b67\u6307\u6570\u66f2\u7ebf\u56fe"
 
 
 def _setup_logging():
@@ -200,7 +200,7 @@ def _compute_prediction(grp: pd.DataFrame, data: pd.DataFrame) -> str:
 def plot_match_curves(data_dir: str, project_dir: str) -> int:
     """
     读取 REPORT_DIR/{YYYYMMDD}/ 下的 car_{YYYYMMDD}.xlsx，按（主队、客队）分组，
-    为每场比赛生成一张图，包含oupei指数曲线图与kailizhishu曲线图两个子图；
+    为每场比赛生成一张图，包含欧赔分歧指数曲线图与kailizhishu曲线图两个子图；
     图片写入 REPORT_DIR/{YYYYMMDD}/。
     返回成功生成的图片数量。
     """
@@ -237,7 +237,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         # 为手机端展示优化：去掉顶部冗余信息并略放大整体图幅
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9.0, 17.0))
 
-        # ---------- oupei指数曲线图 ----------
+        # ---------- 欧赔分歧指数曲线图 ----------
         # 第 1 节点：初指 D/E/F；第 2～N+1 节点：即时 G/H/I（N = 该场比赛时间点数量，由表决定）
         init_main = grp.iloc[0][data.columns[COL_INIT_MAIN]]
         init_draw = grp.iloc[0][data.columns[COL_INIT_DRAW]]
