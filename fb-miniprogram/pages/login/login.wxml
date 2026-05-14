@@ -13,13 +13,13 @@
   </view>
 
   <button
-    class="btn-wechat {{loading ? 'disabled' : ''}}"
+    class="btn-phone-quick {{loading ? 'disabled' : ''}}"
     loading="{{loading}}"
     disabled="{{loading}}"
     open-type="getPhoneNumber"
-    bindgetphonenumber="onWechatQuickLogin"
+    bindgetphonenumber="onPhoneQuickLogin"
   >
-    微信一键登录
+    手机号快捷登录
   </button>
 
   <navigator wx:if="{{showRegisterEntry}}" url="/pages/register/register" open-type="navigate" class="link">没有账号？去注册</navigator>

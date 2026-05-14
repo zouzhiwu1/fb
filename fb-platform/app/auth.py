@@ -319,11 +319,11 @@ def wechat_mp_quick_login():
     if errcode not in (None, 0):
         return jsonify({
             "ok": False,
-            "message": sess.get("errmsg") or f"微信登录失败 errcode={errcode}",
+            "message": sess.get("errmsg") or f"快捷登录失败 errcode={errcode}",
         }), 400
     openid = (sess.get("openid") or "").strip()
     if not openid:
-        return jsonify({"ok": False, "message": "微信未返回 openid"}), 400
+        return jsonify({"ok": False, "message": "未获取到用户标识，请重试"}), 400
 
     phone_ret = get_phone_number(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, phone_code)
     errcode = phone_ret.get("errcode")
@@ -337,7 +337,7 @@ def wechat_mp_quick_login():
         pinfo.get("purePhoneNumber") or pinfo.get("phoneNumber") or ""
     )
     if not _is_valid_phone(phone):
-        return jsonify({"ok": False, "message": "微信未返回有效手机号"}), 400
+        return jsonify({"ok": False, "message": "未获取到有效手机号，请重试"}), 400
 
     try:
         reg_insert_agent_id = None
@@ -348,7 +348,7 @@ def wechat_mp_quick_login():
                 if other and other.id != user.id:
                     return jsonify({
                         "ok": False,
-                        "message": "该微信与当前手机号存在冲突，请先使用手机号登录后再绑定",
+                        "message": "该账号与当前手机号存在冲突，请先使用手机号登录后再绑定",
                     }), 409
                 user.phone = phone
         else:
@@ -562,7 +562,7 @@ def wechat_mp_bind():
     if errcode not in (None, 0):
         return jsonify({
             "ok": False,
-            "message": sess.get("errmsg") or f"微信接口错误 errcode={errcode}",
+            "message": sess.get("errmsg") or f"绑定失败 errcode={errcode}",
         }), 400
     openid = (sess.get("openid") or "").strip()
     if not openid:

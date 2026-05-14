@@ -93,7 +93,7 @@ function bindWechatMp() {
 }
 
 /**
- * 微信小程序一键登录（wx.login + getPhoneNumber）。
+ * 手机号快捷登录（wx.login + getPhoneNumber）。
  */
 function quickLoginWechatMp(phoneCode) {
   return new Promise((resolve, reject) => {
@@ -105,7 +105,7 @@ function quickLoginWechatMp(phoneCode) {
       success: (r) => {
         const loginCode = (r && r.code) || '';
         if (!loginCode) {
-          reject(new Error('微信登录失败，请重试'));
+          reject(new Error('登录凭证获取失败，请重试'));
           return;
         }
         var qBody = {
@@ -128,7 +128,7 @@ function quickLoginWechatMp(phoneCode) {
           })
           .catch(reject);
       },
-      fail: () => reject(new Error('微信登录失败，请重试')),
+      fail: () => reject(new Error('登录凭证获取失败，请重试')),
     });
   });
 }
