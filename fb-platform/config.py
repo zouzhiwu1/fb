@@ -206,6 +206,39 @@ def wechat_v3_config_ok() -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# 微信小程序虚拟支付（米大师 / wx.requestVirtualPayment）
+# ---------------------------------------------------------------------------
+WECHAT_MP_VIRTUAL_APP_KEY = os.environ.get("WECHAT_MP_VIRTUAL_APP_KEY", "").strip()
+WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX = os.environ.get(
+    "WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX", ""
+).strip()
+WECHAT_MP_VIRTUAL_OFFER_ID = os.environ.get("WECHAT_MP_VIRTUAL_OFFER_ID", "").strip()
+WECHAT_MP_VIRTUAL_ENV = int(os.environ.get("WECHAT_MP_VIRTUAL_ENV", "0") or "0")
+_vp_goods_raw = os.environ.get("WECHAT_MP_VIRTUAL_GOODS_JSON", "").strip()
+WECHAT_MP_VIRTUAL_GOODS: dict = {}
+if _vp_goods_raw:
+    import json as _json_vp
+
+    try:
+        _parsed = _json_vp.loads(_vp_goods_raw)
+        if isinstance(_parsed, dict):
+            WECHAT_MP_VIRTUAL_GOODS = _parsed
+    except (_json_vp.JSONDecodeError, TypeError):
+        WECHAT_MP_VIRTUAL_GOODS = {}
+
+
+def wechat_virtual_pay_config_ok() -> bool:
+    """小程序虚拟支付：下单所需配置是否齐全（仍须在 MP 后台开通虚拟支付并发布道具）。"""
+    if not (WECHAT_MP_APP_ID and WECHAT_MP_APP_SECRET):
+        return False
+    if not (WECHAT_MP_VIRTUAL_OFFER_ID and WECHAT_MP_VIRTUAL_GOODS):
+        return False
+    if WECHAT_MP_VIRTUAL_ENV == 1:
+        return bool(WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX or WECHAT_MP_VIRTUAL_APP_KEY)
+    return bool(WECHAT_MP_VIRTUAL_APP_KEY)
+
+
 def _load_membership_prices() -> dict[str, str]:
     """各会员类型标价（元，两位小数字符串）。可用环境变量 MEMBERSHIP_PRICES_JSON 覆盖。"""
     import json

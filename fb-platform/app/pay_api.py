@@ -14,10 +14,16 @@ from flask import Blueprint, Request, jsonify, request
 from app import db
 from app.membership import MEMBERSHIP_TYPES, MEMBERSHIP_TYPE_LABELS
 from app.models import PaymentOrder, User
+from app.payment_fulfillment import (
+    FulfillResult,
+    VerifiedPayment,
+    default_membership_fulfillment,
+)
 from app.payment_providers.alipay import handle_alipay_notify
 from app.payment_providers.wechat import handle_wechat_notify
 from app.wechat_mp_client import (
     build_miniprogram_request_payment_params,
+    jscode2session,
     unifiedorder_jsapi,
     yuan_str_to_total_fee_fen,
 )
@@ -26,6 +32,12 @@ from app.wechat_pay_v3 import (
     jsapi_prepay,
     load_private_key_from_pem,
     load_public_key_from_pem,
+)
+from app.wechat_virtual_pay import (
+    fetch_cgi_access_token,
+    fen_to_price_str,
+    virtual_payment_client_signatures,
+    xpay_query_order,
 )
 from config import (
     ALIPAY_APP_ID,
@@ -39,10 +51,17 @@ from config import (
     WECHAT_MCH_PRIVATE_KEY_PEM,
     WECHAT_MOCK_SECRET,
     WECHAT_MP_APP_ID,
+    WECHAT_MP_APP_SECRET,
+    WECHAT_MP_VIRTUAL_APP_KEY,
+    WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX,
+    WECHAT_MP_VIRTUAL_ENV,
+    WECHAT_MP_VIRTUAL_GOODS,
+    WECHAT_MP_VIRTUAL_OFFER_ID,
     WECHAT_PAY_MODE,
     WECHAT_PLATFORM_PUBLIC_KEY_ID,
     WECHAT_PLATFORM_PUBLIC_KEY_PEM,
     wechat_v3_config_ok,
+    wechat_virtual_pay_config_ok,
 )
 
 pay_bp = Blueprint("pay", __name__)
@@ -107,7 +126,11 @@ def membership_options():
                 "price": price,
             }
         )
-    return jsonify({"ok": True, "options": options})
+    return jsonify({
+        "ok": True,
+        "options": options,
+        "wechat_virtual_pay_ready": wechat_virtual_pay_config_ok(),
+    })
 
 
 @pay_bp.route("/orders", methods=["GET"])
@@ -143,6 +166,9 @@ def create_order():
       - { "membership_type": "month" } 默认支付宝侧自行收银台（与历史行为一致）
       - { "membership_type": "month", "payment_channel": "wechat_mp" } 微信小程序 JSAPI 支付，
         成功时返回 wx_pay 供 wx.requestPayment；需用户已绑定 openid（POST /api/auth/wechat-mp/bind）。
+      - { "membership_type": "month", "payment_channel": "wechat_mp_virtual", "login_code": "<wx.login>" }
+        小程序虚拟支付：返回 virtual_pay 供 wx.requestVirtualPayment；支付成功后请调
+        POST /api/pay/wechat-virtual/confirm 查单并开通会员。
     """
     user_id = _get_user_id()
     if user_id is None:
@@ -152,10 +178,10 @@ def create_order():
     data = request.get_json() or {}
     mtype = (data.get("membership_type") or "").strip().lower()
     payment_channel = (data.get("payment_channel") or "alipay").strip().lower()
-    if payment_channel not in ("alipay", "wechat_mp"):
+    if payment_channel not in ("alipay", "wechat_mp", "wechat_mp_virtual"):
         return jsonify({
             "ok": False,
-            "message": 'payment_channel 须为 alipay 或 wechat_mp',
+            "message": "payment_channel 须为 alipay、wechat_mp 或 wechat_mp_virtual",
         }), 400
     if mtype not in MEMBERSHIP_TYPES:
         return jsonify({
@@ -171,12 +197,77 @@ def create_order():
         return jsonify({"ok": False, "message": "价格配置无效"}), 500
 
     user_row = db.session.get(User, user_id)
-    if payment_channel == "wechat_mp":
+    virtual_session_key: str | None = None
+
+    if payment_channel == "wechat_mp_virtual":
+        if not wechat_virtual_pay_config_ok():
+            return jsonify({
+                "ok": False,
+                "message": (
+                    "服务端未配置小程序虚拟支付：需 WECHAT_MP_APP_ID/SECRET、"
+                    "WECHAT_MP_VIRTUAL_OFFER_ID、WECHAT_MP_VIRTUAL_APP_KEY、"
+                    "WECHAT_MP_VIRTUAL_GOODS_JSON（见 .env.example）"
+                ),
+            }), 503
+        login_code = (data.get("login_code") or "").strip()
+        if not login_code:
+            return jsonify({
+                "ok": False,
+                "message": "缺少 login_code，请先在小程序内调用 wx.login",
+            }), 400
+        sess = jscode2session(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, login_code)
+        if sess.get("errcode") not in (None, 0):
+            return jsonify({
+                "ok": False,
+                "message": sess.get("errmsg") or "登录态无效，请重新 wx.login 后再试",
+            }), 400
+        virtual_session_key = (sess.get("session_key") or "").strip()
+        v_openid = (sess.get("openid") or "").strip()
+        if not virtual_session_key or not v_openid:
+            return jsonify({"ok": False, "message": "未获取到 session_key/openid"}), 400
+        spec = WECHAT_MP_VIRTUAL_GOODS.get(mtype)
+        if not isinstance(spec, dict):
+            return jsonify({
+                "ok": False,
+                "message": f"虚拟支付未配置档位 {mtype}（WECHAT_MP_VIRTUAL_GOODS_JSON）",
+            }), 400
+        pid = (spec.get("productId") or spec.get("product_id") or "").strip()
+        raw_gpf = spec.get("goodsPrice") if "goodsPrice" in spec else spec.get("goods_price")
+        if not pid or raw_gpf is None:
+            return jsonify({
+                "ok": False,
+                "message": f"档位 {mtype} 须含 productId 与 goodsPrice（分）",
+            }), 400
+        try:
+            goods_price_fen = int(raw_gpf)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "message": "goodsPrice 须为整数（分）"}), 400
+        exp_fen = yuan_str_to_total_fee_fen(price)
+        if exp_fen is None or exp_fen <= 0:
+            return jsonify({"ok": False, "message": "金额换算分失败"}), 500
+        if goods_price_fen != exp_fen:
+            return jsonify({
+                "ok": False,
+                "message": (
+                    f"虚拟道具标价（{goods_price_fen} 分）与会员价（{exp_fen} 分）不一致，"
+                    "请同步修改 MEMBERSHIP_PRICES 与 WECHAT_MP_VIRTUAL_GOODS_JSON"
+                ),
+            }), 400
+        if user_row:
+            uo = (user_row.wechat_mp_openid or "").strip()
+            if uo and uo != v_openid:
+                return jsonify({
+                    "ok": False,
+                    "message": "当前账号已绑定其他支付用户，请使用原设备或联系客服",
+                }), 400
+            if not uo:
+                user_row.wechat_mp_openid = v_openid
+    elif payment_channel == "wechat_mp":
         if WECHAT_PAY_MODE != "mock":
             if not user_row or not (user_row.wechat_mp_openid or "").strip():
                 return jsonify({
                     "ok": False,
-                    "message": "请先在小程序内完成微信授权（登录后自动绑定，或重新进入小程序）",
+                    "message": "请先在小程序内完成登录并绑定支付账号（登录后自动绑定，或重新进入小程序）",
                 }), 400
             if WECHAT_PAY_MODE == "v3":
                 if not wechat_v3_config_ok():
@@ -206,7 +297,9 @@ def create_order():
     subject = f"足球数据会员-{labels.get(mtype, mtype)}"
     ts = datetime.now().strftime("%Y%m%d%H%M%S")
     rand = secrets.token_hex(3)
-    if payment_channel == "wechat_mp":
+    if payment_channel == "wechat_mp_virtual":
+        out_trade_no = f"V{user_id % 1000000:06d}{secrets.token_hex(10).upper()}"
+    elif payment_channel == "wechat_mp":
         # 微信商户订单号最长 32 字节
         out_trade_no = f"W{user_id % 1000000:06d}{secrets.token_hex(10).upper()}"
     else:
@@ -323,7 +416,134 @@ def create_order():
                     prepay_id=prepay_id,
                 )
 
+    elif payment_channel == "wechat_mp_virtual":
+        payload["wx_pay"] = None
+        if not virtual_session_key:
+            return jsonify({"ok": False, "message": "内部错误：缺少虚拟支付会话"}), 500
+        app_key = (
+            WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX
+            if WECHAT_MP_VIRTUAL_ENV == 1
+            else WECHAT_MP_VIRTUAL_APP_KEY
+        )
+        spec = WECHAT_MP_VIRTUAL_GOODS.get(mtype)
+        assert isinstance(spec, dict)
+        pid = (spec.get("productId") or spec.get("product_id") or "").strip()
+        raw_gpf = spec.get("goodsPrice") if "goodsPrice" in spec else spec.get("goods_price")
+        goods_price_fen = int(raw_gpf)
+        sign_data = {
+            "offerId": WECHAT_MP_VIRTUAL_OFFER_ID,
+            "buyQuantity": 1,
+            "env": int(WECHAT_MP_VIRTUAL_ENV),
+            "currencyType": "CNY",
+            "productId": pid,
+            "goodsPrice": goods_price_fen,
+            "outTradeNo": out_trade_no,
+            "attach": out_trade_no,
+        }
+        sign_data_str, pay_sig, signature = virtual_payment_client_signatures(
+            virtual_session_key, app_key, sign_data
+        )
+        payload["virtual_pay"] = {
+            "signData": sign_data_str,
+            "paySig": pay_sig,
+            "signature": signature,
+            "mode": "short_series_goods",
+        }
+
     return jsonify(payload)
+
+
+def _virtual_pay_app_key() -> str:
+    if WECHAT_MP_VIRTUAL_ENV == 1 and WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX:
+        return WECHAT_MP_VIRTUAL_APP_KEY_SANDBOX
+    return WECHAT_MP_VIRTUAL_APP_KEY
+
+
+@pay_bp.route("/wechat-virtual/confirm", methods=["POST"])
+def wechat_virtual_confirm():
+    """
+    虚拟支付完成后查单并开通会员（需登录）。
+    Body: { "out_trade_no": "...", "login_code": "<wx.login 新 code>" }
+    """
+    user_id = _get_user_id()
+    if user_id is None:
+        return jsonify(
+            {"ok": False, "message": "账号已在其他设备登录或登录已过期，请重新登录"}
+        ), 401
+    if not wechat_virtual_pay_config_ok():
+        return jsonify({"ok": False, "message": "服务端未配置小程序虚拟支付"}), 503
+
+    body = request.get_json() or {}
+    out_trade_no = (body.get("out_trade_no") or "").strip()
+    login_code = (body.get("login_code") or "").strip()
+    if not out_trade_no or not login_code:
+        return jsonify({"ok": False, "message": "须提供 out_trade_no 与 login_code"}), 400
+
+    order_row = PaymentOrder.query.filter_by(out_trade_no=out_trade_no).first()
+    if not order_row or order_row.user_id != user_id:
+        return jsonify({"ok": False, "message": "订单不存在"}), 404
+
+    sess = jscode2session(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET, login_code)
+    if sess.get("errcode") not in (None, 0):
+        return jsonify({
+            "ok": False,
+            "message": sess.get("errmsg") or "登录态无效，请重新 wx.login",
+        }), 400
+    openid = (sess.get("openid") or "").strip()
+    if not openid:
+        return jsonify({"ok": False, "message": "未获取到 openid"}), 400
+
+    user_row = db.session.get(User, user_id)
+    uo = (user_row.wechat_mp_openid or "").strip() if user_row else ""
+    if uo and uo != openid:
+        return jsonify({"ok": False, "message": "支付用户与当前账号不一致"}), 403
+
+    access_token, terr = fetch_cgi_access_token(WECHAT_MP_APP_ID, WECHAT_MP_APP_SECRET)
+    if not access_token:
+        return jsonify({"ok": False, "message": terr or "获取 access_token 失败"}), 502
+
+    qjson, qerr = xpay_query_order(
+        _virtual_pay_app_key(),
+        access_token,
+        openid,
+        int(WECHAT_MP_VIRTUAL_ENV),
+        out_trade_no,
+    )
+    if not qjson:
+        return jsonify({"ok": False, "message": qerr or "查单失败"}), 502
+
+    wxo = qjson.get("order") or {}
+    status = int(wxo.get("status") if wxo.get("status") is not None else -1)
+    # 2=已支付待发货 3=发货中 4=已发货
+    if status not in (2, 3, 4):
+        return jsonify({
+            "ok": False,
+            "message": f"订单未支付完成（status={status}）",
+            "wx_order": wxo,
+        }), 400
+
+    fee_fen = int(wxo.get("paid_fee") or wxo.get("order_fee") or 0)
+    if fee_fen <= 0:
+        return jsonify({"ok": False, "message": "查单返回金额异常"}), 502
+
+    paid_str = fen_to_price_str(fee_fen)
+    wx_oid = (wxo.get("wx_order_id") or wxo.get("wxpay_order_id") or "").strip()
+
+    outcome = default_membership_fulfillment.fulfill(
+        VerifiedPayment(
+            merchant_order_id=out_trade_no,
+            provider_trade_id=wx_oid,
+            paid_amount=paid_str,
+        )
+    )
+    if outcome.result == FulfillResult.ERR_AMOUNT_MISMATCH:
+        return jsonify({"ok": False, "message": "支付金额与订单不一致"}), 400
+    if outcome.result == FulfillResult.ERR_BAD_ORDER_STATE:
+        return jsonify({"ok": True, "message": "订单已处理", "already": True})
+    if outcome.result in (FulfillResult.OK_FULFILLED, FulfillResult.OK_ALREADY_FULFILLED):
+        return jsonify({"ok": True, "fulfilled": outcome.result == FulfillResult.OK_FULFILLED})
+
+    return jsonify({"ok": False, "message": "开通会员失败，请稍后重试或联系客服"}), 500
 
 
 @pay_bp.route("/alipay/notify", methods=["POST"])
