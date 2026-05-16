@@ -32,7 +32,6 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 
 from config import DOWNLOAD_DIR, REPORT_DIR, DEBUG_LOG_DIR, LOG_RETENTION_DAYS, dated_debug_log_dir
-from evaluation_sync import sync_matches_from_car_for_date
 from log_cleanup import delete_old_logs
 
 # 综合评估表列：A=主队(0), B=客队(1), C=时间点(2), D～L=数据(3～11)
@@ -370,21 +369,6 @@ def main():
         log.info("处理目录: %s", data_dir)
         n = plot_match_curves(data_dir, project_dir)
         total += n
-        # §3.4 入表：只要有 car 表就尝试同步（不依赖 n>0，避免「有评估数据但出图 0 张」时不入表）
-        car_path = os.path.join(REPORT_DIR, logical_date, f"car_{logical_date}.xlsx")
-        if os.path.isfile(car_path):
-            try:
-                ins = sync_matches_from_car_for_date(logical_date)
-                log.info(
-                    "evaluation_matches：已执行同步 date=%s REPORT_DIR=%s INSERT rowcount 累计=%s",
-                    logical_date,
-                    REPORT_DIR,
-                    ins,
-                )
-            except Exception as e:
-                log.warning("evaluation_matches 入表失败（不影响出图）: %s", e, exc_info=True)
-        else:
-            log.warning("evaluation_matches：未找到 %s，跳过入表", car_path)
         if n == 0:
             log.info("本次未生成任何曲线图（n=0），若 car 有数据请检查本日志中的报错。")
     except (FileNotFoundError, ValueError) as e:  # pragma: no cover

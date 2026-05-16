@@ -80,10 +80,10 @@ fb-pipeline/
 ├── crawl_real.py                # 抓取即时比分并下载 .xls
 ├── merge_data.py                # 合并为 master_{YYYYMMDD}.csv
 ├── calc_car.py                  # 计算综合评估，输出 car_{YYYYMMDD}.xlsx
-├── plot_car.py                  # 生成欧赔分歧/kaili曲线图 {主队}_VS_{客队}.png；成功后写入 evaluation_matches 入表
-├── crawl_final.py               # 抓取完场比分，输出 final_{YYYYMMDD}.csv；并维护平台库 evaluation_matches 出表
+├── plot_car.py                  # 生成欧赔分歧/kaili曲线图 {主队}_VS_{客队}.png
+├── crawl_final.py               # 抓取完场比分，输出 final_{YYYYMMDD}.csv
 ├── add_score_to_image.py        # 将完场比分写入报告图片
-├── evaluation_sync.py           # 与平台 MySQL evaluation_matches 同步（§3.4 入表/出表）
+├── evaluation_sync.py           # 历史保留：旧版 evaluation_matches 同步工具（当前流程不再调用）
 ├── config.py                    # 配置（可被环境变量 / .env 覆盖）
 ├── log_cleanup.py               # 日志清理（按保留天数删除旧日志）
 ├── scraper_real.py              # 即时比分页爬虫逻辑
@@ -104,7 +104,7 @@ fb-pipeline/
 
 数据与日志目录（默认在 `WORK_SPACE` 下，见 config.py）：`fb-data/`、`fb-report/`、`fb-log/`。
 
-与 **fb-platform** 共用同一 MySQL 时，可在 `.env` 中设置 **`DATABASE_URL`**（与平台相同，如 `mysql+pymysql://user:pass@127.0.0.1:3306/fb`），以便 `plot_car` / `crawl_final` 自动维护 `evaluation_matches` 表；未设置则跳过同步，仅本地出图/出 CSV。
+曲线图是否完场以图片文件名是否包含比分为准（如 `{主队}[1]_VS_{客队}[0].png`），当前流程不再维护 `evaluation_matches` 表。
 
 ## 运行
 

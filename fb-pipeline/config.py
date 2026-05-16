@@ -26,7 +26,7 @@
   CRAWLER_PAGE_LOAD_STRATEGY  driver.get 页面加载策略：normal / eager / none（默认 eager，避免第三方资源卡死导致 120s 读超时）
   CRAWLER_PAGE_LOAD_TIMEOUT  浏览器导航超时秒数（默认 90）；0 表示不设置
   CRAWLER_SELENIUM_READ_TIMEOUT  Python 与 chromedriver HTTP 读超时秒数（默认 240，须大于导航耗时）
-  DATABASE_URL  与 fb-platform 相同（mysql+pymysql://...），供 evaluation_matches 入表/出表；未设置则跳过
+  DATABASE_URL  与 fb-platform 相同（mysql+pymysql://...），历史 evaluation_matches 同步工具使用；当前主流程不再维护该表
 """
 import datetime
 import os
@@ -54,7 +54,7 @@ except ImportError:
 _DEFAULT_WORK_SPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK_SPACE = os.environ.get("WORK_SPACE", _DEFAULT_WORK_SPACE).rstrip(os.sep)
 
-# 与 fb-platform 共用 MySQL 时配置；供 evaluation_matches 入表/出表。
+# 与 fb-platform 共用 MySQL 时配置；仅历史 evaluation_matches 同步工具使用，当前主流程不再维护该表。
 # 若 .env 里写了 DATABASE_URL=（空），仅用 get 的第二个参数无法回退，故用「or 本地默认」。
 _env_db = os.environ.get("DATABASE_URL", "").strip()
 DATABASE_URL = _env_db or "mysql+pymysql://root:123456@localhost:3306/fb"

@@ -3,7 +3,8 @@
 曲线图查询：按日期和球队名搜索并展示 pipeline 生成的曲线图。
 数据来源：CURVE_IMAGE_DIR 下各日期目录中的 {主队}_VS_{客队}.png；完场后可重命名为
 {主队}[主队比分]_VS_{客队}[客队比分].png。
-权限：按《会员系统设计书》§3.3 — 会员可查全部；非会员仅当该场不在 evaluation_matches（未在综合评估中）时可查。
+权限：按《会员系统设计书》§3.3 — 会员可查全部；非会员仅可查完场比赛。
+完场判定以图片文件名为准：{主队}[主队比分]_VS_{客队}[客队比分].png 表示完场。
 """
 import os
 import re
@@ -11,7 +12,7 @@ from urllib.parse import unquote
 
 from flask import Blueprint, current_app, send_from_directory, jsonify, request
 
-from app.membership import is_member, is_match_under_evaluation
+from app.membership import is_member
 
 curves_bp = Blueprint("curves", __name__)
 
@@ -83,6 +84,11 @@ def _curve_item_from_filename(date: str, filename: str, home_raw: str, away_raw:
     }
 
 
+def _is_finished_by_filename(home_raw: str, away_raw: str) -> bool:
+    """是否完场只看文件名：主客队两侧都带末尾比分 [数字] 才算完场。"""
+    return _score_suffix(home_raw) is not None and _score_suffix(away_raw) is not None
+
+
 def _match_team(keyword: str, home: str, away: str) -> bool:
     if not keyword or not keyword.strip():
         return True
@@ -107,7 +113,7 @@ def api_dates():
 
 @curves_bp.route("/search")
 def api_search():
-    """按日期和球队名搜索曲线图。参数: date=YYYYMMDD, team=可选。需登录；非会员仅可查历史综合评估。"""
+    """按日期和球队名搜索曲线图。会员可查全部；非会员仅可查文件名带比分的完场图。"""
     date = (request.args.get("date") or "").strip()
     team = (request.args.get("team") or "").strip()
     if not date or not re.match(r"^\d{8}$", date):
@@ -139,7 +145,7 @@ def api_search():
         return jsonify({"date": date, "items": []})
     items = []
     matched_team_count = 0
-    skipped_under_evaluation = 0
+    skipped_unfinished = 0
     for fn in os.listdir(dir_path):
         if not fn.endswith(CURVE_SUFFIX):
             continue
@@ -152,14 +158,14 @@ def api_search():
         if not _match_team(team, home, away):
             continue
         matched_team_count += 1
-        if not member and is_match_under_evaluation(date, home, away):
-            skipped_under_evaluation += 1
+        if not member and not _is_finished_by_filename(home_raw, away_raw):
+            skipped_unfinished += 1
             continue
         items.append(_curve_item_from_filename(date, fn, home_raw, away_raw))
     if not items and logger:
-        if matched_team_count > 0 and skipped_under_evaluation > 0:
+        if matched_team_count > 0 and skipped_unfinished > 0:
             logger.info(
-                "曲线图搜索：磁盘上有匹配球队的结果，但非会员且均在 evaluation_matches（综合评估中）"
+                "曲线图搜索：磁盘上有匹配球队的结果，但非会员且文件名未带完场比分"
                 " date=%s team=%s 匹配=%d 目录=%s",
                 date,
                 team,
@@ -175,20 +181,20 @@ def api_search():
     if (
         not items
         and matched_team_count > 0
-        and skipped_under_evaluation > 0
+        and skipped_unfinished > 0
         and not member
     ):
         payload["member_only"] = True
         payload["message"] = (
-            f"已找到 {matched_team_count} 场与「{team}」相关的曲线图，但该日期场次仍在综合评估中，"
-            "按规则仅会员可查看。开通会员后即可浏览。"
+            f"已找到 {matched_team_count} 场与「{team}」相关的曲线图，但文件名尚未带完场比分，"
+            "按规则仅会员可查看未完场比赛。完场后即可浏览。"
         )
     return jsonify(payload)
 
 
 @curves_bp.route("/img/<date>/<path:filename>")
 def serve_image(date, filename):
-    """按日期和文件名提供曲线图图片。当前综合评估需会员，非会员返回 403。"""
+    """按日期和文件名提供曲线图图片。会员可查全部；非会员仅可查文件名带比分的完场图。"""
     if not re.match(r"^\d{8}$", date):
         return "", 404
     user_id = _get_user_id_from_request()
@@ -208,12 +214,10 @@ def serve_image(date, filename):
     if not parsed:
         return "", 404
     home, away = parsed
-    home_for_permission = _strip_score_suffix(home)
-    away_for_permission = _strip_score_suffix(away)
-    if not is_member(user_id) and is_match_under_evaluation(date, home_for_permission, away_for_permission):
+    if not is_member(user_id) and not _is_finished_by_filename(home, away):
         return jsonify({
             "ok": False,
-            "message": "只有会员才能查看正在综合评估中的比赛",
+            "message": "只有会员才能查看未完场比赛",
         }), 403
     base = _get_curve_dir()
     dir_path = os.path.join(base, date)
