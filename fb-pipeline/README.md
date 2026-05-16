@@ -309,15 +309,15 @@ python plot_car.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
   - 有参数：使用指定日期，与报告目录 `REPORT_DIR/YYYYMMDD` 对应。
 - **输出**：`REPORT_DIR/{YYYYMMDD}/final_{YYYYMMDD}.csv`，列：`home, away, score`。定时器可设为每日 14 点执行（见 design.md 2.1）。
 
-**add_score_to_image.py — 把完场比分写入图片**
+**add_score_to_image.py — 把完场比分写入图片文件名**
 
-- **功能**：根据完场 CSV，在 `REPORT_DIR/{YYYYMMDD}/{主队}_VS_{客队}.png` 上叠加比分文字（与 plot_car 生成的文件名一致）。
+- **功能**：根据完场 CSV，将 `REPORT_DIR/{YYYYMMDD}/{主队}_VS_{客队}.png` 重命名为 `{主队}[主队比分]_VS_{客队}[客队比分].png`，避免直接修改图片内容。
 - **用法**：
   ```bash
   python add_score_to_image.py <YYYYMMDD>
   python add_score_to_image.py <path_to_final_YYYYMMDD.csv>
   ```
-- **依赖**：需先运行 `crawl_final.py` 在 `REPORT_DIR/{YYYYMMDD}/` 下生成 `final_{YYYYMMDD}.csv`；对应日期的曲线图需已由 `plot_car.py` 生成。需安装 Pillow（见 requirements.txt）。
+- **依赖**：需先运行 `crawl_final.py` 在 `REPORT_DIR/{YYYYMMDD}/` 下生成 `final_{YYYYMMDD}.csv`；对应日期的曲线图需已由 `plot_car.py` 生成。
 
 ---
 

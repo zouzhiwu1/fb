@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 曲线图查询：按日期和球队名搜索并展示 pipeline 生成的曲线图。
-数据来源：CURVE_IMAGE_DIR 下各日期目录中的 {主队}_VS_{客队}.png（与 plot_car.py 生成格式一致）
+数据来源：CURVE_IMAGE_DIR 下各日期目录中的 {主队}_VS_{客队}.png；完场后可重命名为
+{主队}[主队比分]_VS_{客队}[客队比分].png。
 权限：按《会员系统设计书》§3.3 — 会员可查全部；非会员仅当该场不在 evaluation_matches（未在综合评估中）时可查。
 """
 import os
@@ -26,7 +27,7 @@ def _get_user_id_from_request():
     except Exception:
         return None
 
-# 与 plot_car.py 一致：文件名为 主队_VS_客队.png（无「_曲线」）
+# 与 plot_car.py 一致：文件名为 主队_VS_客队.png（无「_曲线」）；完场后允许追加末尾比分 [n]。
 CURVE_SUFFIX = ".png"
 VS_SEP = "_VS_"
 
@@ -45,6 +46,41 @@ def _parse_curve_filename(basename: str):
         return None
     parts = name.split(VS_SEP, 1)
     return (parts[0].strip(), parts[1].strip()) if len(parts) == 2 else None
+
+
+def _strip_score_suffix(team_name: str) -> str:
+    """去掉完场流程追加的末尾比分，如 `马里迪莫[1]` -> `马里迪莫`。"""
+    return re.sub(r"\[\d+\]$", "", (team_name or "").strip()).strip()
+
+
+def _score_suffix(team_name: str) -> str | None:
+    """返回文件名队名末尾的比分数字；没有则表示未完场。"""
+    m = re.search(r"\[(\d+)\]$", (team_name or "").strip())
+    return m.group(1) if m else None
+
+
+def _curve_item_from_filename(date: str, filename: str, home_raw: str, away_raw: str) -> dict:
+    """根据文件名生成前端展示项；是否完场完全由文件名是否带比分后缀判断。"""
+    home = _strip_score_suffix(home_raw)
+    away = _strip_score_suffix(away_raw)
+    home_score = _score_suffix(home_raw)
+    away_score = _score_suffix(away_raw)
+    finished = home_score is not None and away_score is not None
+    title = (
+        f"{home}[{home_score}] VS {away}[{away_score}]"
+        if finished
+        else f"{home} VS {away}"
+    )
+    return {
+        "date": date,
+        "home": home,
+        "away": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "finished": finished,
+        "title": title,
+        "filename": filename,
+    }
 
 
 def _match_team(keyword: str, home: str, away: str) -> bool:
@@ -110,19 +146,16 @@ def api_search():
         parsed = _parse_curve_filename(fn)
         if not parsed:
             continue
-        home, away = parsed
+        home_raw, away_raw = parsed
+        home = _strip_score_suffix(home_raw)
+        away = _strip_score_suffix(away_raw)
         if not _match_team(team, home, away):
             continue
         matched_team_count += 1
         if not member and is_match_under_evaluation(date, home, away):
             skipped_under_evaluation += 1
             continue
-        items.append({
-            "date": date,
-            "home": home,
-            "away": away,
-            "filename": fn,
-        })
+        items.append(_curve_item_from_filename(date, fn, home_raw, away_raw))
     if not items and logger:
         if matched_team_count > 0 and skipped_under_evaluation > 0:
             logger.info(
@@ -175,7 +208,9 @@ def serve_image(date, filename):
     if not parsed:
         return "", 404
     home, away = parsed
-    if not is_member(user_id) and is_match_under_evaluation(date, home, away):
+    home_for_permission = _strip_score_suffix(home)
+    away_for_permission = _strip_score_suffix(away)
+    if not is_member(user_id) and is_match_under_evaluation(date, home_for_permission, away_for_permission):
         return jsonify({
             "ok": False,
             "message": "只有会员才能查看正在综合评估中的比赛",

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-将完场比分写入报告图片。
+将完场比分写入报告图片文件名。
 以 REPORT_DIR/{YYYYMMDD}/ 目录下的曲线图（{主队}_VS_{客队}.png）为基准，解析每张图的主客队，
-在 final_{YYYYMMDD}.csv 中按队名模糊匹配（忽略 [春1]、[11]、(中) 等后缀），查找到比分后写入图片。
+在 final_{YYYYMMDD}.csv 中按队名模糊匹配（忽略 [春1]、[11]、(中) 等后缀），查找到比分后
+将图片重命名为 {主队}[主队比分]_VS_{客队}[客队比分].png。
 
 用法:
   python add_score_to_image.py <YYYYMMDD>
@@ -17,17 +18,11 @@ import os
 import re
 import sys
 
-from config import REPORT_DIR, WORK_SPACE
+from config import REPORT_DIR
 
 # 日志中路径相对于 pipeline 父目录为根，显示为 fb-data/、fb-report/ 等（无外层 fb/ 前缀）
 def _display_root():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-
-try:
-    from PIL import Image, ImageDraw, ImageFont
-except ImportError:
-    Image = ImageDraw = ImageFont = None
-
 
 def _safe_filename(name: str) -> str:
     """与 plot_car 一致：去掉或替换文件名非法字符。"""
@@ -44,75 +39,57 @@ def _normalize_team_for_match(name: str) -> str:
     return s.strip() or name
 
 
-def _find_font(size: int):
-    """优先使用系统中文字体，否则回退到默认。"""
-    if not ImageFont:
-        return None
-    candidates = [
-        "/System/Library/Fonts/PingFang.ttc",
-        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                pass
-    try:
-        return ImageFont.load_default()
-    except Exception:
-        return None
+def _strip_score_suffix(name: str) -> str:
+    """去掉本脚本追加的末尾比分，如 `马里迪莫[1]` -> `马里迪莫`，便于重复执行。"""
+    return re.sub(r"\[\d+\]$", "", (name or "").strip()).strip()
 
 
-def draw_score_on_image(image_path: str, score_text: str, log, display_path: str = None) -> bool:
+def _parse_score(score_text: str):
+    """解析 `2-1` / `2 : 1` / `2：1` 等比分，返回 (home_score, away_score)。"""
+    m = re.search(r"(\d+)\s*[-:：]\s*(\d+)", score_text or "")
+    if not m:
+        return None
+    return m.group(1), m.group(2)
+
+
+def rename_image_with_score(
+    image_path: str,
+    home: str,
+    away: str,
+    score_text: str,
+    log,
+    display_path: str = None,
+) -> bool:
     """
-    在图片上「预测结果」下一行绘制「实际比分：x-x」，左对齐（与 plot_car 的年度/预测结果一致），覆盖保存。
-    score_text: 如 "2-1" 或 "1 : 0"，会显示为「实际比分：2-1」
-    display_path: 日志中显示的路径（如 fb-report/20260313/xxx.png），未传则用相对 WORK_SPACE 的路径。
+    将 `主队_VS_客队.png` 重命名为 `主队[主队比分]_VS_客队[客队比分].png`。
+    若重复执行，先去掉已有末尾比分后再生成目标名。
     """
-    if not Image or not ImageDraw:
-        log.error("未安装 Pillow，无法写入图片")
+    parsed_score = _parse_score(score_text)
+    if not parsed_score:
+        log.warning("无法解析比分，跳过重命名: %s score=%s", os.path.basename(image_path), score_text)
         return False
-    try:
-        img = Image.open(image_path).convert("RGBA")
-    except Exception as e:
-        try:
-            _rel = os.path.relpath(image_path, _display_root())
-        except Exception:
-            _rel = image_path
-        log.warning("无法打开图片 %s: %s", _rel, e)
-        return False
-    w, h = img.size
-    # 与 plot_car 左上角「预测结果」一致：fontsize=11，图高 10 英寸、dpi=200 时约 11/72*200≈30px
-    font_size = max(14, int(h * 0.015))
-    font = _find_font(font_size)
-    draw = ImageDraw.Draw(img)
-    label = f"实际比分：{score_text}"
-    # 紧贴预测结果下一行，无空白。plot_car 两行(年度/预测结果)底部约在 0.93 fig，对应距顶约 7%
-    x = int(w * 0.02)
-    y = int(h * 0.072)
-    tw = len(label) * (font_size if font else 8)
-    if font:
-        try:
-            bbox = draw.textbbox((0, 0), label, font=font)
-            tw = bbox[2] - bbox[0]
-        except (AttributeError, TypeError):
-            pass
-    padding = 4
-    if font:
-        draw.rectangle([x - padding, y - padding, x + tw + padding, y + font_size + padding], fill=(255, 255, 255, 220))
-        draw.text((x, y), label, fill=(0, 0, 0), font=font)
-    else:
-        draw.text((x, y), label, fill=(0, 0, 0))
-    img.save(image_path, "PNG")
-    if display_path is None:
-        try:
-            display_path = os.path.relpath(image_path, _display_root()).replace(os.sep, "/")
-        except Exception:
-            display_path = os.path.basename(image_path)
-    log.info("已写入比分到: %s", display_path)
+    hs, aws = parsed_score
+    clean_home = _strip_score_suffix(home)
+    clean_away = _strip_score_suffix(away)
+    new_filename = f"{clean_home}[{hs}]_VS_{clean_away}[{aws}].png"
+    new_path = os.path.join(os.path.dirname(image_path), new_filename)
+    if os.path.abspath(image_path) == os.path.abspath(new_path):
+        if display_path is None:
+            display_path = _rel_path(image_path)
+        log.info("比分已在文件名中: %s", display_path)
+        return True
+    if os.path.exists(new_path):
+        os.remove(new_path)
+    os.rename(image_path, new_path)
+    log.info("已按比分重命名: %s -> %s", _rel_path(image_path), _rel_path(new_path))
     return True
+
+
+def _rel_path(path: str) -> str:
+    try:
+        return os.path.relpath(path, _display_root()).replace(os.sep, "/")
+    except Exception:
+        return os.path.basename(path)
 
 
 def _parse_match_from_image_filename(basename: str):
@@ -180,7 +157,7 @@ def main():
         log.warning("CSV 中无有效记录")
         sys.exit(0)
 
-    # 以 {YYYYMMDD} 目录下的曲线图为基准，逐张解析主客队，在 CSV 中模糊匹配后写入比分
+    # 以 {YYYYMMDD} 目录下的曲线图为基准，逐张解析主客队，在 CSV 中模糊匹配后重命名文件
     images = [f for f in os.listdir(report_dir) if f.endswith(".png") and "_VS_" in f]
     done = 0
     no_match = 0
@@ -189,20 +166,20 @@ def main():
         if not img_home or not img_away:
             log.debug("无法解析文件名: %s", filename)
             continue
-        key = (_normalize_team_for_match(img_home), _normalize_team_for_match(img_away))
+        key = (
+            _normalize_team_for_match(_strip_score_suffix(img_home)),
+            _normalize_team_for_match(_strip_score_suffix(img_away)),
+        )
         score = score_by_match.get(key)
         if not score:
             log.debug("未找到匹配的完场记录: %s", filename)
             no_match += 1
             continue
         image_path = os.path.join(report_dir, filename)
-        try:
-            display_path = os.path.relpath(image_path, _display_root()).replace(os.sep, "/")
-        except Exception:
-            display_path = filename
-        if draw_score_on_image(image_path, score, log, display_path=display_path):
+        display_path = _rel_path(image_path)
+        if rename_image_with_score(image_path, img_home, img_away, score, log, display_path=display_path):
             done += 1
-    log.info("共处理 %d 张图片（目录内曲线图 %d 张，%d 张未匹配到完场记录）", done, len(images), no_match)
+    log.info("共处理 %d 张图片重命名（目录内曲线图 %d 张，%d 张未匹配到完场记录）", done, len(images), no_match)
 
 
 if __name__ == "__main__":
