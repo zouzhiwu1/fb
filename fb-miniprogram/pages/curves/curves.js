@@ -38,12 +38,13 @@ Page({
   async initDefaultSearch() {
     const token = api.getToken();
     if (!token) {
-      const date = todayYmd();
+      const date = offsetYmd(-1);
       this.setData({
         date,
         pickerDate: `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`,
         team: '',
       });
+      this.onSearch();
       return;
     }
     let isMember = false;
@@ -83,10 +84,6 @@ Page({
 
   async onSearch() {
     const token = api.getToken();
-    if (!token) {
-      this.setData({ inlineHint: '请先登录后再查询' });
-      return;
-    }
     const d = (this.data.date || '').trim();
     if (!/^\d{8}$/.test(d)) {
       this.setData({ inlineHint: '日期须为 YYYYMMDD' });
@@ -108,6 +105,13 @@ Page({
         token,
       });
       if (status === 401) {
+        if (!token) {
+          this.setData({
+            inlineHint: '未完场比赛仅会员可查看，请先注册登录。已完场比赛可直接浏览。',
+            searching: false,
+          });
+          return;
+        }
         api.clearSession();
         this.setData({ inlineHint: '账号已在其他设备登录或登录已过期，请重新登录' });
         setTimeout(() => wx.reLaunch({ url: '/pages/login/login' }), 700);
@@ -142,7 +146,6 @@ Page({
   async loadNextBatch() {
     if (this.data.loadingMore) return;
     const token = api.getToken();
-    if (!token) return;
     const start = this.data.loadedCount || 0;
     const all = this.data.allItems || [];
     if (start >= all.length) return;

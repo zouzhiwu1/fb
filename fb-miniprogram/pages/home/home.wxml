@@ -1,6 +1,7 @@
 <view class="page">
-  <view class="welcome">你好，{{displayName}}</view>
-  <view class="hint">功能与网页端 home 一致</view>
+  <view class="welcome">{{loggedIn ? '你好，' + displayName : '欢迎使用赛果信息助手'}}</view>
+  <view class="hint">{{loggedIn ? '功能与网页端 home 一致' : '可先浏览已完场比赛曲线图；账户、会员、充值等功能需注册登录后使用。'}}</view>
+  <view wx:if="{{!loggedIn}}" class="login-entry" bindtap="onLogin">注册 / 登录</view>
 
   <view class="card menu">
     <view class="item" bindtap="go" data-url="/pages/curves/curves">
@@ -25,5 +26,5 @@
     </view>
   </view>
 
-  <view class="logout" bindtap="onLogout">退出登录</view>
+  <view wx:if="{{loggedIn}}" class="logout" bindtap="onLogout">退出登录</view>
 </view>

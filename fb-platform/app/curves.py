@@ -113,29 +113,13 @@ def api_dates():
 
 @curves_bp.route("/search")
 def api_search():
-    """按日期和球队名搜索曲线图。会员可查全部；非会员仅可查文件名带比分的完场图。"""
+    """按日期和球队名搜索曲线图。会员可查全部；游客/非会员仅可查文件名带比分的完场图。"""
     date = (request.args.get("date") or "").strip()
     team = (request.args.get("team") or "").strip()
     if not date or not re.match(r"^\d{8}$", date):
         return jsonify({"error": "请提供有效日期 YYYYMMDD", "items": []})
     user_id = _get_user_id_from_request()
-    if user_id is None:
-        return jsonify(
-            {
-                "ok": False,
-                "message": "账号已在其他设备登录或登录已过期，请重新登录",
-                "items": [],
-            }
-        ), 401
-    member = is_member(user_id)
-    # 可选策略：过期即不能看任何曲线（与默认「非会员可看完场/历史」不同）
-    if current_app.config.get("CURVES_REQUIRE_ACTIVE_MEMBERSHIP") and not member:
-        return jsonify({
-            "date": date,
-            "items": [],
-            "member_only": True,
-            "message": "查看曲线图需要当前有效的会员身份。您的会员已过期或未开通。",
-        })
+    member = bool(user_id is not None and is_member(user_id))
     base = _get_curve_dir()
     dir_path = os.path.join(base, date)
     logger = getattr(current_app, "logger", None)
@@ -158,10 +142,13 @@ def api_search():
         if not _match_team(team, home, away):
             continue
         matched_team_count += 1
-        if not member and not _is_finished_by_filename(home_raw, away_raw):
+        item = _curve_item_from_filename(date, fn, home_raw, away_raw)
+        # 同一天可能同时存在已完场和未完场的图片。游客/非会员只过滤当前这张未完场图，
+        # 不能因为前面某张未完场就影响后续已完场图片。
+        if not member and not item["finished"]:
             skipped_unfinished += 1
             continue
-        items.append(_curve_item_from_filename(date, fn, home_raw, away_raw))
+        items.append(item)
     if not items and logger:
         if matched_team_count > 0 and skipped_unfinished > 0:
             logger.info(
@@ -176,7 +163,12 @@ def api_search():
             count_png = sum(1 for f in os.listdir(dir_path) if f.endswith(CURVE_SUFFIX))
             logger.info("曲线图搜索无匹配: date=%s team=%s 目录=%s 该日共 %d 个 .png", date, team, dir_path, count_png)
     items.sort(key=lambda x: (x["home"], x["away"]))
-    payload = {"date": date, "items": items}
+    payload = {
+        "date": date,
+        "items": items,
+        "matched_count": matched_team_count,
+        "skipped_unfinished": skipped_unfinished,
+    }
     # 有文件且队名对得上，但全部被「评估中」权限挡住时，避免用户误以为「没有这张图」
     if (
         not items
@@ -185,28 +177,21 @@ def api_search():
         and not member
     ):
         payload["member_only"] = True
+        action = "请先注册登录" if user_id is None else "请开通会员后查看"
         payload["message"] = (
             f"已找到 {matched_team_count} 场与「{team}」相关的曲线图，但文件名尚未带完场比分，"
-            "按规则仅会员可查看未完场比赛。完场后即可浏览。"
+            f"未完场比赛仅会员可查看，{action}。"
         )
     return jsonify(payload)
 
 
 @curves_bp.route("/img/<date>/<path:filename>")
 def serve_image(date, filename):
-    """按日期和文件名提供曲线图图片。会员可查全部；非会员仅可查文件名带比分的完场图。"""
+    """按日期和文件名提供曲线图图片。会员可查全部；游客/非会员仅可查文件名带比分的完场图。"""
     if not re.match(r"^\d{8}$", date):
         return "", 404
     user_id = _get_user_id_from_request()
-    if user_id is None:
-        return jsonify(
-            {"ok": False, "message": "账号已在其他设备登录或登录已过期，请重新登录"}
-        ), 401
-    if current_app.config.get("CURVES_REQUIRE_ACTIVE_MEMBERSHIP") and not is_member(user_id):
-        return jsonify({
-            "ok": False,
-            "message": "查看曲线图需要当前有效的会员身份。您的会员已过期或未开通。",
-        }), 403
+    member = bool(user_id is not None and is_member(user_id))
     filename = unquote(filename)
     if ".." in filename or not filename.endswith(CURVE_SUFFIX):
         return "", 404
@@ -214,10 +199,11 @@ def serve_image(date, filename):
     if not parsed:
         return "", 404
     home, away = parsed
-    if not is_member(user_id) and not _is_finished_by_filename(home, away):
+    if not member and not _is_finished_by_filename(home, away):
+        action = "请先注册登录" if user_id is None else "请开通会员后查看"
         return jsonify({
             "ok": False,
-            "message": "只有会员才能查看未完场比赛",
+            "message": f"未完场比赛仅会员可查看，{action}。",
         }), 403
     base = _get_curve_dir()
     dir_path = os.path.join(base, date)

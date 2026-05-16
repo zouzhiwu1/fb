@@ -2,24 +2,43 @@ const api = require('../../utils/api.js');
 
 Page({
   data: {
-    displayName: '用户',
+    displayName: '游客',
+    loggedIn: false,
   },
 
   onShow() {
     const token = api.getToken();
     if (!token) {
-      wx.reLaunch({ url: '/pages/login/login' });
+      this.setData({ displayName: '游客', loggedIn: false });
       return;
     }
     const user = api.getUser();
     const name = user?.username || user?.phone || '用户';
-    this.setData({ displayName: name });
+    this.setData({ displayName: name, loggedIn: true });
     api.bindWechatMp();
   },
 
   go(e) {
     const url = e.currentTarget.dataset.url;
+    if (url !== '/pages/curves/curves' && !api.getToken()) {
+      wx.showModal({
+        title: '请先注册登录',
+        content: '该功能需要登录后使用。您可以先浏览已完场比赛的曲线图。',
+        confirmText: '去登录',
+        cancelText: '先浏览',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/login/login' });
+          }
+        },
+      });
+      return;
+    }
     wx.navigateTo({ url });
+  },
+
+  onLogin() {
+    wx.navigateTo({ url: '/pages/login/login' });
   },
 
   onLogout() {
@@ -29,7 +48,7 @@ Page({
       success: (res) => {
         if (res.confirm) {
           api.clearSession();
-          wx.reLaunch({ url: '/pages/login/login' });
+          this.setData({ displayName: '游客', loggedIn: false });
         }
       },
     });
