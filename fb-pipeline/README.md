@@ -345,6 +345,7 @@ python plot_car.py <起始时间YYYYMMDDHH> <终止时间YYYYMMDDHH>
 | `CRAWLER_DEBUG_MATCH_KEYWORDS` | **调试用**：仅抓取主队或客队名称包含任一关键词的比赛，逗号分隔。例如 `帕纳辛纳科斯,里尔,博洛尼亚`。不设或为空则抓取全部 | 未设置 |
 | `CRAWLER_MATCH_FILTER_VISIBLE_ONLY` | `run_real` 列表**可视过滤**：`1` 只处理页面上可见行（与「隐藏 N 场」一致）；`0` 则包含 DOM 内隐藏行 | `1` |
 | `CRAWLER_MATCH_STATUS_MODES` | `run_real` 列表**状态过滤**，逗号分隔、并集：`not_started`（未开场，空白或 `-`）、`live`（进行中）、`finished`（状态列含「完」） | `not_started` |
+| `CRAWLER_MATCH_REQUIRE_JIAN` | `run_real` 推荐过滤：`1` 仅保留含“荐”的比赛；`0` 不按“荐”过滤 | `0` |
 | `CRAWLER_ALLOW_GLOBAL_TABLE_LIVE` | `1` 时在 ScoreDiv 内找不到主表则回退全局 `#table_live`（与完场逻辑类似；Docker/页面与本地不一致时可试） | 未启用 |
 | `CRAWLER_WAIT_ELEMENT` | Selenium 显式等待秒数上限（跨境、弱网、容器慢） | `20` |
 | `CRAWLER_PAGE_LOAD_STRATEGY` | `driver.get` 策略：`eager` 在 DOM 可交互后返回，减少因广告/统计请求卡住导致的 **HTTP read timeout**；`normal` / `none` 见 Selenium 文档 | `eager` |

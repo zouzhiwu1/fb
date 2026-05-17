@@ -1,4 +1,4 @@
-<view class="intro muted">选择会员档位创建订单（与网页端 recharge 一致）</view>
+<view class="intro muted">选择会员档位创建订单</view>
 
 <view wx:if="{{loading}}" class="center muted">加载中…</view>
 

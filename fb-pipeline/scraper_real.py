@@ -194,9 +194,9 @@ class ZhiyunScraper:
                 n_after_jian = len(match_rows)
                 log.info(
                     "【荐过滤】%d -> %d 场（剔除 %d）",
-                    n_after_league,
+                    n_after_team,
                     n_after_jian,
-                    n_after_league - n_after_jian,
+                    n_after_team - n_after_jian,
                 )
             else:
                 log.info("【荐过滤】当前设置：未启用（CRAWLER_MATCH_REQUIRE_JIAN=0）")

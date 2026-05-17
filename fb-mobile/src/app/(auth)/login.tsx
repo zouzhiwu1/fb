@@ -85,7 +85,7 @@ export default function LoginScreen() {
         style={styles.flex}>
         <View style={styles.box}>
           <Text style={styles.title}>足球数据平台</Text>
-          <Text style={styles.sub}>使用手机号与密码登录（与网页端同一账号）</Text>
+          <Text style={styles.sub}>使用手机号与密码登录</Text>
 
           <Text style={styles.label}>手机号</Text>
           <TextInput

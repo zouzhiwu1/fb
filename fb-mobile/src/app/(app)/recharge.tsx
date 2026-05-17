@@ -64,7 +64,7 @@ export default function RechargeScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        <Text style={styles.intro}>选择会员档位创建订单（与网页端 recharge 一致）</Text>
+        <Text style={styles.intro}>选择会员档位创建订单</Text>
         {loading ? (
           <ActivityIndicator style={{ marginTop: 24 }} color={UI.accent} />
         ) : (

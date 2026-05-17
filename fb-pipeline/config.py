@@ -16,7 +16,7 @@
   CRAWLER_EXPORT_EXCEL_DOWNLOAD_WAIT_SECONDS  每次点击导出后等待目录内出现 .xls 的最长时间（秒，默认 15；智云常固定文件名覆盖，需结合 mtime 检测）
   CRAWLER_MATCH_FILTER_VISIBLE_ONLY  1=只收集页面上可见行；0=含 DOM 隐藏行
   CRAWLER_MATCH_STATUS_MODES  状态过滤，逗号分隔：not_started,live,finished（默认 not_started）
-  CRAWLER_MATCH_REQUIRE_JIAN  1=仅保留包含“荐”的比赛；0=不过滤“荐”（默认 1）
+  CRAWLER_MATCH_REQUIRE_JIAN  1=仅保留包含“荐”的比赛；0=不过滤“荐”（默认 0）
   CRAWLER_CHROME_USER_AGENT  覆盖 Chrome User-Agent（默认桌面 Chrome，避免 HeadlessChrome 被拒）
   CRAWLER_CHROME_DISABLE_HTTP2  设为 1 时禁用 HTTP/2（排查协议问题时使用）
   CRAWLER_CHROME_BINARY  浏览器可执行文件路径（Docker 内常见 /usr/bin/chromium）；简写 CHROME_BINARY 亦有效
@@ -163,7 +163,7 @@ _DEFAULT_TARGET_LEAGUES = (
     "法国杯,西甲,西乙,西杯,西班牙杯,苏冠,苏超,欧冠联赛,欧罗巴联赛,欧罗巴杯,欧会杯,解放者杯,"
     "欧协联赛,南俱杯,阿职联,阿甲,巴西甲,巴西乙,智利甲,中北美冠,美职业,亚冠,墨西联春,墨西联秋,"
     "韩K联,韩K2联,日职联,日职乙,天皇杯,希腊超,芬超,芬甲,芬兰杯,罗甲,奥甲,奥乙,爱超,爱甲,"
-    "比甲,比乙,荷甲,荷乙,捷甲,冰岛超,瑞典超"
+    "比甲,比乙,荷甲,荷乙,捷甲,捷甲冠,冰岛超,瑞典超"
 )
 _target_leagues_env = os.environ.get("CRAWLER_TARGET_LEAGUES")
 if _target_leagues_env is not None:
@@ -186,8 +186,8 @@ MATCH_STATUS_MODES = [x.strip().lower() for x in _status_modes_raw.split(",") if
 if not MATCH_STATUS_MODES:
     MATCH_STATUS_MODES = ["not_started"]
 # 3) 联赛：TARGET_LEAGUE_NAMES；空列表表示不限制（见上）
-# 4) 推荐：是否仅保留记录里包含“荐”的比赛（默认开启）
-MATCH_REQUIRE_JIAN = _env_flag("CRAWLER_MATCH_REQUIRE_JIAN", "1")
+# 4) 推荐：是否仅保留记录里包含“荐”的比赛（默认关闭；如需只抓荐，设为 1）
+MATCH_REQUIRE_JIAN = _env_flag("CRAWLER_MATCH_REQUIRE_JIAN", "0")
 
 # 即时比分：strict 选择器找不到主表时是否允许回退到页面内任意 #table_live（默认关，避免误用 main2）
 ALLOW_GLOBAL_TABLE_LIVE = os.environ.get(
