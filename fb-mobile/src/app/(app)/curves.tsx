@@ -179,7 +179,7 @@ export default function CurvesScreen() {
             </View>
           )}
 
-          <Text style={styles.label}>球队名（选填，主或客，模糊匹配）</Text>
+          <Text style={styles.label}>按照名称查询</Text>
           <TextInput
             style={styles.input}
             value={team}

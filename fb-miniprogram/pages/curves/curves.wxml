@@ -5,7 +5,7 @@
       <view class="input">{{pickerDate || '请选择日期'}}</view>
     </picker>
 
-    <view class="label">球队名（选填，主或客，模糊匹配）</view>
+    <view class="label">按照名称查询</view>
     <input class="input" value="{{team}}" placeholder="留空则查询当天全部" bindinput="onTeam" />
 
     <view class="btn-primary {{searching ? 'disabled' : ''}}" bindtap="onSearch">

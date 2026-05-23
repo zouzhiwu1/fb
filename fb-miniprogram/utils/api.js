@@ -1,8 +1,8 @@
 const { API_BASE } = require('./config.js');
 const promo = require('./promoAgent.js');
 
-const TOKEN_KEY = 'football_platform_token';
-const USER_KEY = 'football_platform_user';
+const TOKEN_KEY = 'fb_platform_token';
+const USER_KEY = 'fb_platform_user';
 
 function normalizePath(path) {
   return path.startsWith('/') ? path : `/${path}`;

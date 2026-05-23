@@ -11,8 +11,8 @@ import React, {
 import type { UserDto } from '@/api/auth';
 import { fetchMe } from '@/api/auth';
 
-const TOKEN_KEY = 'football_platform_token';
-const USER_KEY = 'football_platform_user';
+const TOKEN_KEY = 'fb_platform_token';
+const USER_KEY = 'fb_platform_user';
 
 type AuthContextValue = {
   token: string | null;
