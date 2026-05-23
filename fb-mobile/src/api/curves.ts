@@ -1,7 +1,13 @@
 import { apiFetch } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 
-export type CurveItem = { date: string; home: string; away: string; filename: string };
+export type CurveItem = {
+  date: string;
+  home: string;
+  away: string;
+  filename: string;
+  title?: string;
+};
 
 export async function fetchCurveDates() {
   return apiFetch<{ dates: string[] }>('/api/curves/dates', { method: 'GET' });

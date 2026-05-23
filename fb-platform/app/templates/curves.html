@@ -257,7 +257,7 @@
           const card = document.createElement('div');
           card.className = 'card';
           const title = document.createElement('h3');
-          title.textContent = item.home + ' VS ' + item.away;
+          title.textContent = item.title || (item.home + ' : ' + item.away);
           const img = document.createElement('img');
           img.alt = item.home + ' VS ' + item.away;
           img.loading = 'lazy';

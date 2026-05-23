@@ -68,9 +68,9 @@ def _curve_item_from_filename(date: str, filename: str, home_raw: str, away_raw:
     away_score = _score_suffix(away_raw)
     finished = home_score is not None and away_score is not None
     title = (
-        f"{home}[{home_score}] VS {away}[{away_score}]"
+        f"{home}[{home_score}] : {away}[{away_score}]"
         if finished
-        else f"{home} VS {away}"
+        else f"{home} : {away}"
     )
     return {
         "date": date,

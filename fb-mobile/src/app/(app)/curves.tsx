@@ -217,7 +217,7 @@ export default function CurvesScreen() {
             return (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>
-                  {it.home} VS {it.away}
+                  {it.title ?? `${it.home} : ${it.away}`}
                 </Text>
                 <View style={styles.imgWrap}>
                   <Image
