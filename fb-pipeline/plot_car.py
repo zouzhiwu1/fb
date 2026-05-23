@@ -43,11 +43,12 @@ COL_KELLY_MAIN, COL_KELLY_DRAW, COL_KELLY_AWAY = 9, 10, 11
 CAR_HEADER_ROWS = 2
 NUM_COLUMNS = 12
 
-# 子图轴文案（\uXXXX Unicode 转义，与凯利子图一致，避免编码/字体下标题显示异常）
+# 子图轴文案（\uXXXX Unicode 转义，避免编码/字体下标题显示异常）
 PLOT_TIME_XLABEL = "\u65f6\u95f4\u70b9"
-PLOT_KELLY_YLABEL = "\u51ef\u5229\u6307\u6570"
-PLOT_KELLY_TITLE = "\u51ef\u5229\u6307\u6570\u66f2\u7ebf\u56fe"
-PLOT_OUPEI_TITLE = "\u6b27\u8d54\u5206\u6b67\u6307\u6570\u66f2\u7ebf\u56fe"
+PLOT_KELLY_YLABEL = "\u8d44\u91d1\u5206\u5e03\u6307\u6570"  # 资金分布指数
+PLOT_KELLY_TITLE = "\u8d44\u91d1\u5206\u5e03\u6307\u6570\u66f2\u7ebf\u56fe"  # 资金分布指数曲线图
+PLOT_OUPEI_TITLE = "\u7efc\u5408\u5b9e\u529b\u6307\u6570\u66f2\u7ebf\u56fe"  # 综合实力指数曲线图
+PLOT_STRENGTH_YLABEL = "\u70ed\u5ea6\u503c"  # 热度值
 
 
 def _setup_logging():
@@ -248,16 +249,16 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
         y_draw = [init_draw] + grp[data.columns[COL_LIVE_DRAW]].tolist()
         y_away = [init_away] + grp[data.columns[COL_LIVE_AWAY]].tolist()
 
-        ax1.plot(x_pos, y_main, "o-", label="主", color="C0", linewidth=2, markersize=5)
-        ax1.plot(x_pos, y_draw, "s-", label="平", color="C1", linewidth=2, markersize=5)
-        ax1.plot(x_pos, y_away, "^-", label="客", color="C2", linewidth=2, markersize=5)
+        ax1.plot(x_pos, y_main, "o-", label="H", color="C0", linewidth=2, markersize=5)
+        ax1.plot(x_pos, y_draw, "s-", label="D", color="C1", linewidth=2, markersize=5)
+        ax1.plot(x_pos, y_away, "^-", label="A", color="C2", linewidth=2, markersize=5)
         _annotate_line_points(ax1, x_pos, y_main, "C0")
         _annotate_line_points(ax1, x_pos, y_draw, "C1")
         _annotate_line_points(ax1, x_pos, y_away, "C2")
         ax1.set_xticks(x_pos)
         ax1.set_xticklabels(x_labels, rotation=45, ha="right")
         ax1.tick_params(axis="both", labelsize=17)
-        ax1.set_ylabel("评估值", fontsize=17)
+        ax1.set_ylabel(PLOT_STRENGTH_YLABEL, fontsize=17)
         ax1.set_title(PLOT_OUPEI_TITLE, fontsize=20)
         ax1.legend(loc="best", fontsize=13)
         ax1.grid(True, alpha=0.3)
@@ -268,7 +269,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
             x_kelly,
             grp[data.columns[COL_KELLY_MAIN]],
             "o-",
-            label="主",
+            label="H",
             color="C0",
             linewidth=2,
             markersize=5,
@@ -277,7 +278,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
             x_kelly,
             grp[data.columns[COL_KELLY_DRAW]],
             "s-",
-            label="平",
+            label="D",
             color="C1",
             linewidth=2,
             markersize=5,
@@ -286,7 +287,7 @@ def plot_match_curves(data_dir: str, project_dir: str) -> int:
             x_kelly,
             grp[data.columns[COL_KELLY_AWAY]],
             "^-",
-            label="客",
+            label="A",
             color="C2",
             linewidth=2,
             markersize=5,
