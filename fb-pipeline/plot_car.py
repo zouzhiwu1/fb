@@ -45,7 +45,7 @@ NUM_COLUMNS = 12
 
 # 子图轴文案（\uXXXX Unicode 转义，避免编码/字体下标题显示异常）
 PLOT_TIME_XLABEL = "\u65f6\u95f4\u70b9"
-PLOT_KELLY_YLABEL = "\u8d44\u91d1\u5206\u5e03\u6307\u6570"  # 资金分布指数
+PLOT_KELLY_YLABEL = "\u8d44\u91d1\u5206\u5e03"  # 资金分布
 PLOT_KELLY_TITLE = "\u8d44\u91d1\u5206\u5e03\u66f2\u7ebf\u56fe"  # 资金分布曲线图
 PLOT_OUPEI_TITLE = "\u7efc\u5408\u5b9e\u529b\u66f2\u7ebf\u56fe"  # 综合实力曲线图
 PLOT_STRENGTH_YLABEL = "\u70ed\u5ea6\u503c"  # 热度值
