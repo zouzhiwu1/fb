@@ -1,6 +1,6 @@
 <view class="page">
   <view class="welcome">{{loggedIn ? '你好，' + displayName : '欢迎使用赛果信息助手'}}</view>
-  <view class="hint">{{loggedIn ? '欢迎使用赛果助手' : '可先浏览完场比赛曲线图；账户、会员、充值等功能需注册登录后使用。'}}</view>
+  <view class="hint">{{loggedIn ? '欢迎使用赛果助手' : '可先浏览完场曲线图；账户、会员、充值等功能需注册登录后使用。'}}</view>
   <view wx:if="{{!loggedIn}}" class="login-entry" bindtap="onLogin">注册 / 登录</view>
 
   <view class="card menu">

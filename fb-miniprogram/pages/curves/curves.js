@@ -107,7 +107,7 @@ Page({
       if (status === 401) {
         if (!token) {
           this.setData({
-            inlineHint: '未完场比赛仅会员可查看，请先注册登录。已完场比赛可直接浏览。',
+            inlineHint: '未完场仅会员可查看，请先注册登录。已完场可直接浏览。',
             searching: false,
           });
           return;

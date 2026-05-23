@@ -23,7 +23,7 @@ Page({
     if (url !== '/pages/curves/curves' && !api.getToken()) {
       wx.showModal({
         title: '请先注册登录',
-        content: '该功能需要登录后使用。您可以先浏览已完场比赛的曲线图。',
+        content: '该功能需要登录后使用。您可以先浏览已完场的曲线图。',
         confirmText: '去登录',
         cancelText: '先浏览',
         success: (res) => {
