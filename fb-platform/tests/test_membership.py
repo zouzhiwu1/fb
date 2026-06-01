@@ -6,14 +6,21 @@ from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import app.membership as membership_mod
+from app import db
 from app.membership import (
     MEMBERSHIP_DURATION_DAYS,
+    SOURCE_GIFT,
+    SOURCE_PURCHASE,
     _is_historical_assessment,
     _parse_yyyymmdd_to_beijing_day,
     _compute_expires_at,
+    add_membership,
     is_match_under_evaluation,
     non_member_may_view_curve,
+    restack_membership_records_for_user,
 )
+from app.models import MembershipRecord
+from tests.conftest import make_test_user_and_token
 
 
 BEIJING = ZoneInfo("Asia/Shanghai")
@@ -116,6 +123,96 @@ def test_is_member_strict_expires_at_boundary():
             return_value=datetime(2026, 3, 21, 8, 51, 0),
         ):
             assert membership_mod.is_member(1) is False
+
+
+def test_add_membership_chains_after_pending_records(platform_app):
+    """先赠送周卡、再买周卡、再买月卡：每笔接在前序最晚到期之后（含待生效）。"""
+    with platform_app.app_context():
+        uid, _ = make_test_user_and_token(platform_app)
+        gift_eff = datetime(2026, 5, 27, 5, 51, 27)
+        gift_exp = datetime(2026, 6, 3, 5, 51, 27)
+        db.session.add(
+            MembershipRecord(
+                user_id=uid,
+                membership_type="week",
+                effective_at=gift_eff,
+                expires_at=gift_exp,
+                source=SOURCE_GIFT,
+                order_id=None,
+            )
+        )
+        db.session.commit()
+
+        with patch.object(
+            membership_mod,
+            "_membership_now_naive",
+            return_value=datetime(2026, 5, 28, 10, 0, 0),
+        ):
+            add_membership(uid, "week", SOURCE_PURCHASE, "ORDER_WEEK")
+
+        with patch.object(
+            membership_mod,
+            "_membership_now_naive",
+            return_value=datetime(2026, 6, 1, 20, 0, 0),
+        ):
+            add_membership(uid, "month", SOURCE_PURCHASE, "ORDER_MONTH")
+
+        rows = (
+            MembershipRecord.query.filter_by(user_id=uid)
+            .order_by(MembershipRecord.id.asc())
+            .all()
+        )
+        assert len(rows) == 3
+        week_buy_exp = gift_exp + timedelta(days=7)
+        month_exp = week_buy_exp + timedelta(days=30)
+        assert rows[1].effective_at == gift_exp
+        assert rows[1].expires_at == week_buy_exp
+        assert rows[2].effective_at == week_buy_exp
+        assert rows[2].expires_at == month_exp
+
+
+def test_restack_membership_records_for_user(platform_app):
+    with platform_app.app_context():
+        uid, _ = make_test_user_and_token(platform_app)
+        gift_eff = datetime(2026, 5, 27, 5, 51, 27)
+        gift_exp = datetime(2026, 6, 3, 5, 51, 27)
+        wrong_month_eff = datetime(2026, 6, 3, 5, 51, 27)
+        wrong_month_exp = datetime(2026, 7, 3, 5, 51, 27)
+        db.session.add(
+            MembershipRecord(
+                user_id=uid,
+                membership_type="week",
+                effective_at=gift_eff,
+                expires_at=gift_exp,
+                source=SOURCE_GIFT,
+            )
+        )
+        db.session.add(
+            MembershipRecord(
+                user_id=uid,
+                membership_type="week",
+                effective_at=gift_exp,
+                expires_at=gift_exp + timedelta(days=7),
+                source=SOURCE_PURCHASE,
+                order_id="W1",
+            )
+        )
+        db.session.add(
+            MembershipRecord(
+                user_id=uid,
+                membership_type="month",
+                effective_at=wrong_month_eff,
+                expires_at=wrong_month_exp,
+                source=SOURCE_PURCHASE,
+                order_id="M1",
+            )
+        )
+        db.session.commit()
+        n = restack_membership_records_for_user(uid)
+        assert n >= 1
+        month_row = MembershipRecord.query.filter_by(user_id=uid, order_id="M1").one()
+        assert month_row.effective_at == gift_exp + timedelta(days=7)
+        assert month_row.expires_at == gift_exp + timedelta(days=7 + 30)
 
 
 @patch.object(membership_mod, "EvaluationMatch")

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchMembershipStatus, type MembershipActiveRecord } from '@/api/membership';
+import { fetchMembershipStatus, type MembershipRecord } from '@/api/membership';
 import { useAuth } from '@/context/AuthContext';
 import { UI } from '@/constants/ui';
 
@@ -24,24 +24,21 @@ function fmtLocal(iso: string | null | undefined): string {
   }
 }
 
-function daysRemaining(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const end = new Date(iso);
-  const now = new Date();
-  const ms = end.getTime() - now.getTime();
-  if (ms <= 0) return 0;
-  return Math.ceil(ms / 86400000);
-}
-
 function shortOrderId(id: string | number | null | undefined): string {
   if (id == null || id === '') return '—';
   const s = String(id);
   return s.length > 18 ? `${s.slice(0, 18)}…` : s;
 }
 
-function RecordCard({ r }: { r: MembershipActiveRecord }) {
+function RecordCard({ r }: { r: MembershipRecord }) {
+  const pending = r.status === 'pending';
   return (
-    <View style={styles.recordCard}>
+    <View style={[styles.recordCard, pending && styles.recordCardPending]}>
+      <View style={styles.recordStatusRow}>
+        <Text style={[styles.statusTag, pending ? styles.statusTagPending : styles.statusTagActive]}>
+          {r.status_label || (pending ? '待生效' : '生效中')}
+        </Text>
+      </View>
       <View style={styles.recordRow}>
         <Text style={styles.recordLabel}>类型</Text>
         <Text style={styles.recordValue}>{r.membership_type_label || r.membership_type || '—'}</Text>
@@ -71,7 +68,11 @@ export default function MembershipScreen() {
   const [data, setData] = useState<{
     is_member?: boolean;
     expires_at?: string | null;
-    active_records?: MembershipActiveRecord[];
+    days_remaining?: number | null;
+    active_expires_at?: string | null;
+    active_days_remaining?: number | null;
+    active_records?: MembershipRecord[];
+    pending_records?: MembershipRecord[];
     free_week_granted_at?: string | null;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -91,7 +92,11 @@ export default function MembershipScreen() {
       setData({
         is_member: body.is_member,
         expires_at: body.expires_at,
+        days_remaining: body.days_remaining,
+        active_expires_at: body.active_expires_at,
+        active_days_remaining: body.active_days_remaining,
         active_records: body.active_records,
+        pending_records: body.pending_records,
         free_week_granted_at: body.free_week_granted_at,
       });
     } else {
@@ -112,7 +117,10 @@ export default function MembershipScreen() {
   };
 
   const isMember = !!data?.is_member;
-  const days = daysRemaining(data?.expires_at ?? undefined);
+  const totalDays = data?.days_remaining ?? null;
+  const activeDays = data?.active_days_remaining ?? null;
+  const hasPending = !!(data?.pending_records && data.pending_records.length > 0);
+  const allRecords = [...(data?.active_records ?? []), ...(data?.pending_records ?? [])];
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -134,30 +142,46 @@ export default function MembershipScreen() {
               {data?.expires_at ? (
                 <>
                   <Text style={styles.expireLine}>
-                    会员到期时间（最晚）：<Text style={styles.expireStrong}>{fmtLocal(data.expires_at)}</Text>
+                    权益总到期（含待生效）：
+                    <Text style={styles.expireStrong}>{fmtLocal(data.expires_at)}</Text>
                   </Text>
-                  {days !== null ? (
+                  {totalDays !== null ? (
                     <Text style={styles.daysLeft}>
-                      {days > 0 ? `剩余约 ${days} 天` : '即将到期或已临近边界，请以到期时刻为准'}
+                      {totalDays > 0
+                        ? `总剩余约 ${totalDays} 天（至上述日期止）`
+                        : '总权益即将到期，请以到期时刻为准'}
                     </Text>
+                  ) : null}
+                  {hasPending && data.active_expires_at ? (
+                    <>
+                      <Text style={styles.segmentLine}>
+                        当前生效至：
+                        <Text style={styles.segmentStrong}>{fmtLocal(data.active_expires_at)}</Text>
+                      </Text>
+                      {activeDays !== null ? (
+                        <Text style={styles.daysLeftSegment}>
+                          {activeDays > 0
+                            ? `本段剩余约 ${activeDays} 天；续期权益将在生效后继续累计`
+                            : '本段即将结束，续期权益将接续生效'}
+                        </Text>
+                      ) : null}
+                    </>
                   ) : null}
                 </>
               ) : null}
             </View>
 
-            <Text style={styles.sectionTitle}>当前有效权益明细</Text>
+            <Text style={styles.sectionTitle}>权益明细</Text>
             <Text style={styles.sectionHint}>
-              多条记录同时有效时，到期时间取最晚一条；下列为当前仍在有效期内的片段。
+              已购会员在上一段到期后顺延生效；「待生效」表示已付款、尚未到生效时刻的权益。
             </Text>
 
-            {!(data?.active_records && data.active_records.length) ? (
+            {!allRecords.length ? (
               <View style={styles.card}>
-                <Text style={styles.emptyHint}>
-                  当前没有生效中的会员权益。注册赠送的周会员若已过期，也会显示在此处为空。
-                </Text>
+                <Text style={styles.emptyHint}>当前没有未过期的会员权益记录。</Text>
               </View>
             ) : (
-              data.active_records.map((r, i) => <RecordCard key={i} r={r} />)
+              allRecords.map((r, i) => <RecordCard key={`${r.status}-${i}`} r={r} />)
             )}
 
             {data?.free_week_granted_at ? (
@@ -211,9 +235,12 @@ const styles = StyleSheet.create({
   badgeYes: { backgroundColor: '#16a34a' },
   badgeNo: { backgroundColor: '#64748b' },
   badgeText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  expireLine: { marginTop: 10, fontSize: 15, color: UI.text },
+  expireLine: { marginTop: 10, fontSize: 15, color: UI.text, lineHeight: 22 },
   expireStrong: { color: UI.accent, fontWeight: '700' },
-  daysLeft: { marginTop: 6, fontSize: 13, color: UI.muted },
+  daysLeft: { marginTop: 6, fontSize: 13, color: UI.muted, lineHeight: 20 },
+  segmentLine: { marginTop: 12, fontSize: 14, color: UI.text, lineHeight: 20 },
+  segmentStrong: { color: '#fbbf24', fontWeight: '600' },
+  daysLeftSegment: { marginTop: 4, fontSize: 12, color: UI.muted, lineHeight: 18 },
   sectionTitle: {
     marginHorizontal: 16,
     marginTop: 24,
@@ -238,6 +265,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: UI.border,
   },
+  recordCardPending: {
+    borderColor: '#854d0e',
+    backgroundColor: '#1c1917',
+  },
+  recordStatusRow: { marginBottom: 8 },
+  statusTag: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  statusTagActive: { color: '#86efac', backgroundColor: '#14532d' },
+  statusTagPending: { color: '#fde68a', backgroundColor: '#422006' },
   recordRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

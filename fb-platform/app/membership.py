@@ -4,10 +4,11 @@
 - membership_records.effective_at / expires_at：MySQL DATETIME 无时区；不做时区换算，与运行环境的
   「当前系统时间」使用同一套墙上时钟数字直接比较（datetime.now() 的 naive 本地时刻 ↔ 库中列值）。
 - 是否仍为会员：effective_at <= now < expires_at（左闭右开，精确到 datetime 精度）。
-- 多次购买/续费：在当前剩余有效期基础上顺延。
+- 多次购买/续费：在所有尚未过期权益（含待生效）的最晚到期之后顺延。
 - 各档时长为**固定天数**（自 effective_at 起）：周 7、月 30、季 120、年 365；到期时刻与生效同一时分秒（+N 天）。
 - 历史/当前综合评估等仍按设计书使用「北京自然日」（见 _is_historical_assessment）。
 """
+import math
 import re
 import unicodedata
 from datetime import date, datetime, timedelta
@@ -194,23 +195,6 @@ def is_member(user_id: int) -> bool:
     return False
 
 
-def _get_current_expires_at_naive(user_id: int) -> datetime | None:
-    """当前有效期内最晚的 expires_at（naive，与库一致，用于顺延）。若无则 None。"""
-    now = _membership_now_naive()
-    records = MembershipRecord.query.filter_by(user_id=user_id).all()
-    valid: list[datetime] = []
-    for r in records:
-        eff = _row_membership_dt_naive(r.effective_at)
-        exp = _row_membership_dt_naive(r.expires_at)
-        if eff is None or exp is None:
-            continue
-        if eff <= now < exp:
-            valid.append(exp)
-    if not valid:
-        return None
-    return max(valid)
-
-
 def _get_latest_unexpired_expires_at_naive(user_id: int) -> datetime | None:
     """所有尚未过期权益（含待生效）中最晚的 expires_at，供前端展示总到期日。"""
     now = _membership_now_naive()
@@ -225,6 +209,29 @@ def _get_latest_unexpired_expires_at_naive(user_id: int) -> datetime | None:
     if not candidates:
         return None
     return max(candidates)
+
+
+def _days_remaining_ceil(expires_at: datetime, now: datetime) -> int:
+    """距 expires_at 剩余整天数（向上取整，与库中 datetime 同一标尺）。"""
+    secs = (expires_at - now).total_seconds()
+    if secs <= 0:
+        return 0
+    return math.ceil(secs / 86400)
+
+
+def _membership_record_payload(r: MembershipRecord) -> dict:
+    mtype = r.membership_type or ""
+    eff = _row_membership_dt_naive(r.effective_at)
+    exp = _row_membership_dt_naive(r.expires_at)
+    return {
+        "membership_type": mtype,
+        "membership_type_label": MEMBERSHIP_TYPE_LABELS.get(mtype, mtype or "—"),
+        "effective_at": eff.isoformat() if eff else None,
+        "expires_at": exp.isoformat() if exp else None,
+        "source": r.source,
+        "source_label": _membership_source_label(r.source or ""),
+        "order_id": r.order_id,
+    }
 
 
 def grant_free_week(user_id: int) -> bool:
@@ -261,13 +268,14 @@ def add_membership(
     order_id: str | None = None,
 ) -> bool:
     """
-    增加会员权益（支付成功回调等调用）。在当前剩余有效期基础上顺延。
+    增加会员权益（支付成功回调等调用）。
+    顺延锚点：所有尚未过期权益（含待生效）的最晚 expires_at；若无则从 now 起算。
     membership_type: week / month / quarter / year
     """
     if membership_type not in MEMBERSHIP_TYPES:
         return False
     now = _membership_now_naive()
-    base_expires = _get_current_expires_at_naive(user_id)
+    base_expires = _get_latest_unexpired_expires_at_naive(user_id)
     if base_expires:
         effective_at = base_expires if base_expires > now else now
     else:
@@ -287,6 +295,43 @@ def add_membership(
     return True
 
 
+def restack_membership_records_for_user(user_id: int) -> int:
+    """
+    按 id 升序重算该用户各条记录的 effective_at / expires_at（与 add_membership 顺延一致）。
+    首条保留原 effective_at，后续每条接在上一条 expires_at 之后。返回更新条数。
+    """
+    records = (
+        MembershipRecord.query.filter_by(user_id=user_id)
+        .order_by(MembershipRecord.id.asc())
+        .all()
+    )
+    if not records:
+        return 0
+    chain_end: datetime | None = None
+    updated = 0
+    for r in records:
+        mtype = r.membership_type or ""
+        if mtype not in MEMBERSHIP_DURATION_DAYS:
+            continue
+        eff_old = _row_membership_dt_naive(r.effective_at)
+        exp_old = _row_membership_dt_naive(r.expires_at)
+        if chain_end is None:
+            if eff_old is None:
+                continue
+            eff = eff_old
+        else:
+            eff = chain_end
+        exp = _compute_expires_at(eff, mtype)
+        if eff_old != eff or exp_old != exp:
+            r.effective_at = eff
+            r.expires_at = exp
+            updated += 1
+        chain_end = exp
+    if updated:
+        db.session.commit()
+    return updated
+
+
 def _membership_source_label(source: str) -> str:
     if source == SOURCE_GIFT:
         return "赠送"
@@ -298,38 +343,44 @@ def _membership_source_label(source: str) -> str:
 def get_membership_status(user_id: int) -> dict:
     """
     返回当前会员状态，供前端展示。
-    兼容旧字段：is_member、expires_at（所有尚未过期权益中最晚到期，含待生效顺延记录）。
-    扩展：active_records（当前生效中的明细）、free_week_granted_at（是否曾领取注册周会员）。
+    - is_member：当前是否有效（effective_at <= now < expires_at）。
+    - expires_at / days_remaining：所有尚未过期权益（含待生效）的最晚到期与剩余天数。
+    - active_expires_at / active_days_remaining：当前正在生效片段的最晚到期与剩余天数。
+    - active_records / pending_records：生效中 / 待生效（已购顺延）明细。
     """
     member = is_member(user_id)
     now = _membership_now_naive()
     records = (
         MembershipRecord.query.filter_by(user_id=user_id)
-        .order_by(MembershipRecord.expires_at.desc())
+        .order_by(MembershipRecord.effective_at.asc(), MembershipRecord.expires_at.asc())
         .all()
     )
     active_records: list[dict] = []
+    pending_records: list[dict] = []
+    active_expires_list: list[datetime] = []
     for r in records:
         eff = _row_membership_dt_naive(r.effective_at)
         exp = _row_membership_dt_naive(r.expires_at)
-        if eff is None or exp is None:
+        if eff is None or exp is None or exp <= now:
             continue
+        payload = _membership_record_payload(r)
         if eff <= now < exp:
-            mtype = r.membership_type or ""
-            active_records.append(
-                {
-                    "membership_type": mtype,
-                    "membership_type_label": MEMBERSHIP_TYPE_LABELS.get(
-                        mtype, mtype or "—"
-                    ),
-                    "effective_at": eff.isoformat(),
-                    "expires_at": exp.isoformat(),
-                    "source": r.source,
-                    "source_label": _membership_source_label(r.source or ""),
-                    "order_id": r.order_id,
-                }
-            )
+            active_records.append({**payload, "status": "active", "status_label": "生效中"})
+            active_expires_list.append(exp)
+        elif eff > now:
+            pending_records.append({**payload, "status": "pending", "status_label": "待生效"})
+
     expires_at = _get_latest_unexpired_expires_at_naive(user_id)
+    active_expires_at = max(active_expires_list) if active_expires_list else None
+
+    days_remaining = (
+        _days_remaining_ceil(expires_at, now) if expires_at is not None else None
+    )
+    active_days_remaining = (
+        _days_remaining_ceil(active_expires_at, now)
+        if active_expires_at is not None
+        else None
+    )
 
     user = db.session.get(User, user_id)
     free_week_iso = None
@@ -339,6 +390,12 @@ def get_membership_status(user_id: int) -> dict:
     return {
         "is_member": member,
         "expires_at": expires_at.isoformat() if expires_at else None,
+        "days_remaining": days_remaining,
+        "active_expires_at": (
+            active_expires_at.isoformat() if active_expires_at else None
+        ),
+        "active_days_remaining": active_days_remaining,
         "active_records": active_records,
+        "pending_records": pending_records,
         "free_week_granted_at": free_week_iso,
     }

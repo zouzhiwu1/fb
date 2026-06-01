@@ -15,19 +15,26 @@
       <text class="badge-t">{{isMember ? '会员有效' : '非会员'}}</text>
     </view>
     <block wx:if="{{expiresAt}}">
-      <text class="expire">会员到期时间（最晚）：\n<text class="strong">{{expiresAtFmt}}</text></text>
+      <text class="expire">权益总到期（含待生效）：\n<text class="strong">{{expiresAtFmt}}</text></text>
       <text wx:if="{{daysLeft !== null}}" class="days">{{daysText}}</text>
+      <block wx:if="{{showSegment}}">
+        <text class="segment">当前生效至：\n<text class="segment-strong">{{activeExpiresAtFmt}}</text></text>
+        <text wx:if="{{activeDaysText}}" class="days-seg">{{activeDaysText}}</text>
+      </block>
     </block>
   </view>
 
-  <text class="sec-title">当前有效权益明细</text>
-  <text class="sec-hint">多条记录同时有效时，到期时间取最晚一条；下列为当前仍在有效期内的片段。</text>
+  <text class="sec-title">权益明细</text>
+  <text class="sec-hint">已购会员在上一段到期后顺延生效；「待生效」表示已付款、尚未到生效时刻的权益。</text>
 
   <view wx:if="{{!records.length}}" class="card empty-box">
-    <text class="empty">当前没有生效中的会员权益。</text>
+    <text class="empty">当前没有未过期的会员权益记录。</text>
   </view>
 
-  <view wx:for="{{records}}" wx:key="index" class="card rec">
+  <view wx:for="{{records}}" wx:key="index" class="card rec {{item.isPending ? 'rec-pending' : ''}}">
+    <view class="rec-tag {{item.isPending ? 'tag-pending' : 'tag-active'}}">
+      <text>{{item.statusLabel}}</text>
+    </view>
     <view class="rec-row"><text class="rec-l">类型</text><text class="rec-r">{{item.membership_type_label || item.membership_type || '—'}}</text></view>
     <view class="rec-row"><text class="rec-l">来源</text><text class="rec-r">{{item.source_label || item.source || '—'}}</text></view>
     <view class="rec-row"><text class="rec-l">生效时间</text><text class="rec-r">{{item.effFmt}}</text></view>

@@ -118,11 +118,20 @@ ALTER TABLE users ADD UNIQUE KEY username (username);
 - Header: `Authorization: Bearer <token>`  
 - 返回字段：  
   - **`is_member`**：当前是否为有效会员（存在 `effective_at <= now < expires_at` 的记录）。  
-  - **`expires_at`**：所有**尚未过期**权益（含待生效顺延）中**最晚**的到期时间（ISO 字符串）；已全部过期为 `null`。  
-  - **`active_records`**：当前仍在有效期内的权益明细列表；每项含 `membership_type`、`membership_type_label`（中文档名）、`effective_at`、`expires_at`、`source`（`gift`/`purchase`）、`source_label`、`order_id`（购买时有值）。  
+  - **`expires_at`** / **`days_remaining`**：所有**尚未过期**权益（含待生效顺延）的最晚到期与剩余整天数（服务端与库同一标尺计算）。
+  - **`active_expires_at`** / **`active_days_remaining`**：当前**正在生效**片段的最晚到期与本段剩余天数（有待生效续期时用于区分「总到期」与「本段到期」）。
+  - **`active_records`**：生效中明细；**`pending_records`**：待生效（已购顺延）明细。每项含 `status`（`active`/`pending`）、`status_label`、`membership_type`、`membership_type_label`、`effective_at`、`expires_at`、`source`、`source_label`、`order_id`。
   - **`free_week_granted_at`**：若注册时曾成功发放过赠送周会员，为该操作时间（ISO）；否则 `null`。  
 
 网页 **`/membership`** 使用上述接口展示状态、到期时间与表格明细。
+
+支付顺延：`add_membership` 以**所有尚未过期**记录的最晚 `expires_at` 为下一笔生效起点（含待生效），避免多笔购买叠在同一时刻。
+
+历史数据纠错（按 `id` 顺序重算整链）：
+
+```bash
+cd fb-platform && python3 scripts/restack_membership.py --user-id 58
+```
 
 ### 会员充值（支付宝）流程
 

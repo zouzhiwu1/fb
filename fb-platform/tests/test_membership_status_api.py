@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """会员状态 API 与会员信息页。"""
+import secrets
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 
+from app.auth import _create_token
+
 from app import db
-from app.models import MembershipRecord
+from app.models import MembershipRecord, User
 from tests.conftest import make_test_user_and_token
 
 
@@ -57,7 +60,7 @@ def test_membership_status_with_active_record(platform_app, platform_client):
             )
         )
         db.session.commit()
-        token = _create_token(uid)
+        token = _create_token(uid, int(u.session_version or 1))
 
     mid = datetime(2030, 6, 16, 12, 0, 0)
     with patch("app.membership._membership_now_naive", return_value=mid):
@@ -120,8 +123,13 @@ def test_membership_status_expires_at_includes_queued_records(platform_app, plat
     assert data["ok"] is True
     assert data["is_member"] is True
     assert data["expires_at"].startswith("2026-07-03")
+    assert data["days_remaining"] == 32
+    assert data["active_expires_at"].startswith("2026-06-03")
+    assert data["active_days_remaining"] == 2
     assert len(data["active_records"]) == 1
     assert data["active_records"][0]["membership_type"] == "week"
+    assert len(data["pending_records"]) == 1
+    assert data["pending_records"][0]["membership_type"] == "month"
 
 
 def test_membership_page_renders(platform_client):

@@ -11,15 +11,6 @@ function fmtLocal(iso) {
   }
 }
 
-function daysRemaining(iso) {
-  if (!iso) return null;
-  const end = new Date(iso);
-  const now = new Date();
-  const ms = end.getTime() - now.getTime();
-  if (ms <= 0) return 0;
-  return Math.ceil(ms / 86400000);
-}
-
 function shortOrderId(id) {
   if (id == null || id === '') return '—';
   const s = String(id);
@@ -35,6 +26,9 @@ Page({
     expiresAtFmt: '',
     daysLeft: null,
     daysText: '',
+    activeExpiresAtFmt: '',
+    activeDaysText: '',
+    showSegment: false,
     records: [],
     giftText: '',
   },
@@ -66,21 +60,35 @@ Page({
         }
         const isMember = !!data.is_member;
         const expiresAt = data.expires_at || '';
-        const days = daysRemaining(expiresAt);
+        const days = data.days_remaining;
         let daysText = '';
-        if (days !== null) {
+        if (days != null) {
           daysText =
             days > 0
-              ? `剩余约 ${days} 天`
-              : '即将到期或已临近边界，请以到期时刻为准';
+              ? `总剩余约 ${days} 天（至上述日期止）`
+              : '总权益即将到期，请以到期时刻为准';
         }
-        const raw = data.active_records || [];
-        const records = raw.map((r) => ({
+        const activeDays = data.active_days_remaining;
+        const hasPending = (data.pending_records || []).length > 0;
+        let activeDaysText = '';
+        if (hasPending && data.active_expires_at && activeDays != null) {
+          activeDaysText =
+            activeDays > 0
+              ? `本段剩余约 ${activeDays} 天；续期权益将在生效后继续累计`
+              : '本段即将结束，续期权益将接续生效';
+        }
+        const mapRec = (r) => ({
           ...r,
           effFmt: fmtLocal(r.effective_at),
           expFmt: fmtLocal(r.expires_at),
           orderShort: shortOrderId(r.order_id),
-        }));
+          statusLabel: r.status_label || (r.status === 'pending' ? '待生效' : '生效中'),
+          isPending: r.status === 'pending',
+        });
+        const records = [
+          ...(data.active_records || []).map(mapRec),
+          ...(data.pending_records || []).map(mapRec),
+        ];
         let giftText = '';
         if (data.free_week_granted_at) {
           giftText = `注册赠送周会员已发放过（记录时间：${fmtLocal(
@@ -95,6 +103,9 @@ Page({
           expiresAtFmt: fmtLocal(expiresAt),
           daysLeft: days,
           daysText,
+          activeExpiresAtFmt: fmtLocal(data.active_expires_at),
+          activeDaysText,
+          showSegment: hasPending && !!data.active_expires_at,
           records,
           giftText,
         });

@@ -81,6 +81,51 @@
   color: #9ca3af;
 }
 
+.segment {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  color: #f9fafb;
+}
+
+.segment-strong {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.days-seg {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.rec-pending {
+  border-color: #854d0e !important;
+}
+
+.rec-tag {
+  margin-bottom: 16rpx;
+}
+
+.tag-active text,
+.tag-pending text {
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.tag-active text {
+  color: #86efac;
+  background: #14532d;
+}
+
+.tag-pending text {
+  color: #fde68a;
+  background: #422006;
+}
+
 .sec-title {
   display: block;
   margin: 48rpx 32rpx 16rpx;
