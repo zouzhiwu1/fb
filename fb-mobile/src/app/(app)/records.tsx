@@ -13,6 +13,11 @@ import { fetchOrders, type OrderItem } from '@/api/pay';
 import { useAuth } from '@/context/AuthContext';
 import { UI } from '@/constants/ui';
 
+function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return iso.replace('T', ' ').replace(/\.\d+/, '');
+}
+
 export default function RecordsScreen() {
   const { token } = useAuth();
   const [orders, setOrders] = useState<OrderItem[]>([]);
@@ -46,8 +51,8 @@ export default function RecordsScreen() {
       <Text style={styles.meta}>状态：{item.status_label}</Text>
       <Text style={styles.meta}>金额：¥ {item.total_amount}</Text>
       <Text style={styles.meta}>单号：{item.out_trade_no}</Text>
-      <Text style={styles.meta}>创建：{item.created_at ?? '—'}</Text>
-      {item.paid_at ? <Text style={styles.meta}>支付：{item.paid_at}</Text> : null}
+      <Text style={styles.meta}>创建：{fmtDateTime(item.created_at)}</Text>
+      {item.paid_at ? <Text style={styles.meta}>支付：{fmtDateTime(item.paid_at)}</Text> : null}
     </View>
   );
 

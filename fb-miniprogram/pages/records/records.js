@@ -1,5 +1,10 @@
 const api = require('../../utils/api.js');
 
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return String(iso).replace('T', ' ').replace(/\.\d+/, '');
+}
+
 Page({
   data: {
     orders: [],
@@ -30,7 +35,12 @@ Page({
       .request('/api/pay/orders?limit=50', { method: 'GET', token })
       .then(({ ok, data }) => {
         if (ok && data.ok && data.orders) {
-          this.setData({ orders: data.orders, emptyHint: '暂无订单' });
+          const orders = (data.orders || []).map((o) => ({
+            ...o,
+            created_at_fmt: fmtDateTime(o.created_at),
+            paid_at_fmt: o.paid_at ? fmtDateTime(o.paid_at) : '',
+          }));
+          this.setData({ orders, emptyHint: '暂无订单' });
         } else {
           this.setData({ orders: [], emptyHint: '暂无订单' });
         }

@@ -53,11 +53,7 @@
 
   function fmtLocal(iso) {
     if (!iso) return '—';
-    try {
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return iso;
-      return d.toLocaleString('zh-CN', { hour12: false });
-    } catch (e) { return iso; }
+    return String(iso).replace('T', ' ').replace(/\.\d+/, '');
   }
 
   function statusClass(s) {

@@ -7,7 +7,7 @@
     <text class="meta">状态：{{item.status_label}}</text>
     <text class="meta">金额：¥ {{item.total_amount}}</text>
     <text class="meta">单号：{{item.out_trade_no}}</text>
-    <text class="meta">创建：{{item.created_at || '—'}}</text>
-    <text wx:if="{{item.paid_at}}" class="meta">支付：{{item.paid_at}}</text>
+    <text class="meta">创建：{{item.created_at_fmt}}</text>
+    <text wx:if="{{item.paid_at_fmt}}" class="meta">支付：{{item.paid_at_fmt}}</text>
   </view>
 </scroll-view>
