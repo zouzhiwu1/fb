@@ -118,7 +118,7 @@ ALTER TABLE users ADD UNIQUE KEY username (username);
 - Header: `Authorization: Bearer <token>`  
 - 返回字段：  
   - **`is_member`**：当前是否为有效会员（存在 `effective_at <= now < expires_at` 的记录）。  
-  - **`expires_at`**：所有**当前有效**权益中**最晚**的到期时间（ISO 字符串）；非会员为 `null`。  
+  - **`expires_at`**：所有**尚未过期**权益（含待生效顺延）中**最晚**的到期时间（ISO 字符串）；已全部过期为 `null`。  
   - **`active_records`**：当前仍在有效期内的权益明细列表；每项含 `membership_type`、`membership_type_label`（中文档名）、`effective_at`、`expires_at`、`source`（`gift`/`purchase`）、`source_label`、`order_id`（购买时有值）。  
   - **`free_week_granted_at`**：若注册时曾成功发放过赠送周会员，为该操作时间（ISO）；否则 `null`。  
 

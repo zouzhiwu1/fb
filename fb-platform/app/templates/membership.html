@@ -125,7 +125,7 @@
 
       var expLine = document.getElementById('expire-line');
       var daysEl = document.getElementById('days-left');
-      if (isMember && data.expires_at) {
+      if (data.expires_at) {
         expLine.style.display = 'block';
         expLine.innerHTML = '会员到期时间（最晚）：<strong>' + fmtLocal(data.expires_at) + '</strong>';
         var days = daysRemaining(data.expires_at);

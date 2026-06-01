@@ -131,7 +131,7 @@ export default function MembershipScreen() {
               <View style={[styles.badge, isMember ? styles.badgeYes : styles.badgeNo]}>
                 <Text style={styles.badgeText}>{isMember ? '会员有效' : '非会员'}</Text>
               </View>
-              {isMember && data?.expires_at ? (
+              {data?.expires_at ? (
                 <>
                   <Text style={styles.expireLine}>
                     会员到期时间（最晚）：<Text style={styles.expireStrong}>{fmtLocal(data.expires_at)}</Text>

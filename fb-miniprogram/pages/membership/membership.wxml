@@ -14,7 +14,7 @@
     <view class="badge {{isMember ? 'yes' : 'no'}}">
       <text class="badge-t">{{isMember ? '会员有效' : '非会员'}}</text>
     </view>
-    <block wx:if="{{isMember && expiresAt}}">
+    <block wx:if="{{expiresAt}}">
       <text class="expire">会员到期时间（最晚）：\n<text class="strong">{{expiresAtFmt}}</text></text>
       <text wx:if="{{daysLeft !== null}}" class="days">{{daysText}}</text>
     </block>

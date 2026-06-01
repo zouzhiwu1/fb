@@ -211,6 +211,22 @@ def _get_current_expires_at_naive(user_id: int) -> datetime | None:
     return max(valid)
 
 
+def _get_latest_unexpired_expires_at_naive(user_id: int) -> datetime | None:
+    """所有尚未过期权益（含待生效）中最晚的 expires_at，供前端展示总到期日。"""
+    now = _membership_now_naive()
+    records = MembershipRecord.query.filter_by(user_id=user_id).all()
+    candidates: list[datetime] = []
+    for r in records:
+        exp = _row_membership_dt_naive(r.expires_at)
+        if exp is None:
+            continue
+        if exp > now:
+            candidates.append(exp)
+    if not candidates:
+        return None
+    return max(candidates)
+
+
 def grant_free_week(user_id: int) -> bool:
     """
     为新用户赠送周会员。仅当该账号从未获得过赠送时发放。
@@ -282,7 +298,7 @@ def _membership_source_label(source: str) -> str:
 def get_membership_status(user_id: int) -> dict:
     """
     返回当前会员状态，供前端展示。
-    兼容旧字段：is_member、expires_at（所有当前有效权益中最晚的到期时间）。
+    兼容旧字段：is_member、expires_at（所有尚未过期权益中最晚到期，含待生效顺延记录）。
     扩展：active_records（当前生效中的明细）、free_week_granted_at（是否曾领取注册周会员）。
     """
     member = is_member(user_id)
@@ -292,7 +308,6 @@ def get_membership_status(user_id: int) -> dict:
         .order_by(MembershipRecord.expires_at.desc())
         .all()
     )
-    valid_expires: list[datetime] = []
     active_records: list[dict] = []
     for r in records:
         eff = _row_membership_dt_naive(r.effective_at)
@@ -300,7 +315,6 @@ def get_membership_status(user_id: int) -> dict:
         if eff is None or exp is None:
             continue
         if eff <= now < exp:
-            valid_expires.append(exp)
             mtype = r.membership_type or ""
             active_records.append(
                 {
@@ -315,7 +329,7 @@ def get_membership_status(user_id: int) -> dict:
                     "order_id": r.order_id,
                 }
             )
-    expires_at = max(valid_expires) if valid_expires else None
+    expires_at = _get_latest_unexpired_expires_at_naive(user_id)
 
     user = db.session.get(User, user_id)
     free_week_iso = None
