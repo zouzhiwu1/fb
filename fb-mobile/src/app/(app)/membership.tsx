@@ -18,7 +18,7 @@ function fmtLocal(iso: string | null | undefined): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString('zh-CN', { hour12: false });
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
   } catch {
     return iso;
   }
